@@ -12,6 +12,7 @@ on:
 
 jobs:
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,7 +33,22 @@ jobs:
 
     - name: Run tests
       run: go test -v ./...
-
+      
+  lint:
+    name: Run Linter
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./otto
+        
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.x
+        
     - name: Run linter
       uses: golangci/golangci-lint-action@v4
       with:

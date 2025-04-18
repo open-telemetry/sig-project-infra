@@ -1,0 +1,11 @@
+web_hook_secret: "your_web_hook_secret"
+port: "8080"
+db_path: "data.db"
+github_token: "" # GitHub personal access token for API requests
+log:
+  level: "info"
+  format: "json"
+modules:
+  name: "example"
+  config:
+    key: "value"

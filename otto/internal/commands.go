@@ -17,10 +17,10 @@ import (
 
 // IsSlashCommand checks if a comment body contains a slash command.
 func IsSlashCommand(body string) bool {
-	lines := strings.SplitSeq(body, "\n")
-	for line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "/") && len(line) > 1 && !strings.HasPrefix(line, "//") {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "/") && !strings.HasPrefix(trimmed, "//") {
 			return true
 		}
 	}
@@ -40,7 +40,7 @@ func LogSlashCommand(ctx context.Context, command string, args []string, issuer,
 		))
 	defer span.End()
 
-	slog.Debug("slash command detected",
+	slog.Debug("Slash command detected",
 		"command", command,
 		"args_count", len(args),
 		"issuer", issuer,

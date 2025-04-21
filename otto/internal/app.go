@@ -80,7 +80,7 @@ func (a *App) Start(ctx context.Context) error {
 	// Start HTTP server (non-blocking)
 	go func() {
 		if err := a.server.Start(); err != nil {
-			a.Logger.Error("server error", "err", err)
+			a.Logger.Error("Server error", "err", err)
 		}
 	}()
 
@@ -92,23 +92,23 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) Shutdown(ctx context.Context) error {
 	// Shutdown server
 	if err := a.server.Shutdown(ctx); err != nil {
-		a.Logger.Error("error during server shutdown", "err", err)
+		a.Logger.Error("Error during server shutdown", "err", err)
 	}
 
 	// Shutdown modules
 	if err := a.shutdownModules(ctx); err != nil {
-		a.Logger.Error("error during module shutdown", "err", err)
+		a.Logger.Error("Error during module shutdown", "err", err)
 	}
 
 	// Shutdown telemetry
 	if err := ShutdownTelemetry(ctx); err != nil {
-		a.Logger.Error("error during telemetry shutdown", "err", err)
+		a.Logger.Error("Error during telemetry shutdown", "err", err)
 	}
 
 	// Close database
 	if a.DB != nil {
 		if err := a.DB.Close(); err != nil {
-			a.Logger.Error("error closing database", "err", err)
+			a.Logger.Error("Error closing database", "err", err)
 		}
 	}
 
@@ -133,7 +133,7 @@ func (a *App) initializeModules(ctx context.Context) error {
 	for name, mod := range modules {
 		if initializer, ok := mod.(ModuleInitializer); ok {
 			if err := initializer.Initialize(ctx, a); err != nil {
-				a.Logger.Error("failed to initialize module", "name", name, "err", err)
+				a.Logger.Error("Failed to initialize module", "name", name, "err", err)
 				return err
 			}
 		}
@@ -155,7 +155,7 @@ func (a *App) shutdownModules(ctx context.Context) error {
 			go func(n string, m ModuleShutdowner) {
 				defer wg.Done()
 				if err := m.Shutdown(ctx); err != nil {
-					a.Logger.Error("module shutdown error", "name", n, "err", err)
+					a.Logger.Error("Module shutdown error", "name", n, "err", err)
 					errors <- err
 				}
 			}(name, shutdowner)
@@ -183,7 +183,7 @@ func (a *App) DispatchEvent(eventType string, event any, raw []byte) {
 	for name, mod := range modules {
 		go func(n string, m Module) {
 			if err := m.HandleEvent(eventType, event, raw); err != nil {
-				a.Logger.Error("event handling error", "module", n, "event", eventType, "err", err)
+				a.Logger.Error("Event handling error", "module", n, "event", eventType, "err", err)
 			}
 		}(name, mod)
 	}

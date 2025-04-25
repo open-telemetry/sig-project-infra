@@ -5,7 +5,9 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/otto
+  - id: otto
+    binary: otto
+    main: ./cmd/otto
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,6 +26,8 @@ dockers:
       - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}"
       - "ghcr.io/open-telemetry/sig-project-infra/otto:latest"
     dockerfile: Dockerfile.goreleaser
+    ids:
+      - otto
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"

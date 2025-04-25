@@ -1,11 +1,20 @@
-web_hook_secret: "your_web_hook_secret"
+# Example non-secret configuration file
+# This file contains non-sensitive configuration options
+
+# Server port (default: 8080)
 port: "8080"
+
+# Database file path (default: data.db)
 db_path: "data.db"
-github_token: "" # GitHub personal access token for API requests
+
+# Logging configuration
 log:
-  level: "info"
-  format: "json"
+  level: "info"  # Log level: debug, info, warn, error
+  format: "json" # Log format: json or text
+
+# Module-specific configuration
 modules:
-  name: "example"
-  config:
-    key: "value"
+  # Example module configuration
+  oncall:
+    rotation_policy: "round_robin"  # round_robin, sequential, random
+    default_schedule: "primary"

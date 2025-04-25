@@ -19,8 +19,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Load configuration path from environment
+	// Load configuration paths from environment
 	configPath := internal.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
+	secretsPath := internal.GetEnvOrDefault("OTTO_SECRETS", "secrets.yaml")
 
 	// Load configuration into global config
 	err := internal.LoadConfig(configPath)
@@ -30,7 +31,7 @@ func main() {
 	}
 
 	// Create and initialize application
-	app, err := internal.NewApp(ctx, configPath)
+	app, err := internal.NewApp(ctx, configPath, secretsPath)
 	if err != nil {
 		slog.Error("failed to initialize application", "err", err)
 		os.Exit(1)

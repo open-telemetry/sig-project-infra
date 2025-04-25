@@ -5,18 +5,21 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/google/go-github/v71/github"
+	"github.com/jferrl/go-githubauth"
+	"golang.org/x/oauth2"
 )
 
 // App encapsulates all application dependencies
 type App struct {
 	Config         *AppConfig
+	Secrets        SecretConfig
 	DB             *sql.DB
 	Logger         *slog.Logger
-	WebhookSecret  string
 	Addr           string
 	GitHubClient   *github.Client  // GitHub API client for interacting with GitHub
 	server         *Server
@@ -24,9 +27,15 @@ type App struct {
 }
 
 // NewApp creates and initializes a new application instance
-func NewApp(ctx context.Context, configPath string) (*App, error) {
+func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	// Load configuration
 	config, err := LoadConfigFromFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Load secrets
+	secrets, err := LoadSecrets(secretsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -34,20 +43,14 @@ func NewApp(ctx context.Context, configPath string) (*App, error) {
 	// Initialize app with config
 	app := &App{
 		Config:         config,
-		WebhookSecret:  config.WebHookSecret,
+		Secrets:        secrets,
 		Addr:           config.Port,
 		shutdownSignal: make(chan struct{}),
 	}
 	
 	// Initialize GitHub client
-	if config.GitHubToken != "" {
-		// When a token is provided, use it to create an authenticated client
-		app.GitHubClient = github.NewClient(nil).WithAuthToken(config.GitHubToken)
-		slog.Info("GitHub client initialized with authentication")
-	} else {
-		// Otherwise, create a standard unauthenticated client
-		app.GitHubClient = github.NewClient(nil)
-		slog.Info("GitHub client initialized (no auth)")
+	if err := app.initializeGitHubClient(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
 	// Initialize telemetry
@@ -65,7 +68,7 @@ func NewApp(ctx context.Context, configPath string) (*App, error) {
 	}
 
 	// Create HTTP server with app reference
-	app.server = NewServerWithApp(app.WebhookSecret, app.Addr, app)
+	app.server = NewServerWithApp(app.Addr, app.Secrets, app)
 
 	return app, nil
 }
@@ -187,4 +190,37 @@ func (a *App) DispatchEvent(eventType string, event any, raw []byte) {
 			}
 		}(name, mod)
 	}
+}
+
+// initializeGitHubClient sets up the GitHub API client with proper authentication
+func (a *App) initializeGitHubClient(ctx context.Context) error {
+	// Check if GitHub App authentication is configured
+	appID := a.Secrets.GetGitHubAppID()
+	installID := a.Secrets.GetGitHubInstallationID()
+	privateKey := a.Secrets.GetGitHubPrivateKey()
+	
+	if appID > 0 && installID > 0 && len(privateKey) > 0 {
+		// Use GitHub App authentication
+		appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
+		if err != nil {
+			return fmt.Errorf("failed to create GitHub app token source: %w", err)
+		}
+		
+		installationTokenSource := githubauth.NewInstallationTokenSource(installID, appTokenSource)
+		
+		// Create an HTTP client that uses the installation token
+		httpClient := oauth2.NewClient(ctx, installationTokenSource)
+		
+		// Create a new GitHub client with the custom HTTP client
+		a.GitHubClient = github.NewClient(httpClient)
+		slog.Info("GitHub client initialized with GitHub App authentication",
+			"app_id", appID,
+			"installation_id", installID)
+	} else {
+		// If no authentication configured, use unauthenticated client
+		a.GitHubClient = github.NewClient(nil)
+		slog.Info("GitHub client initialized (no auth)")
+	}
+	
+	return nil
 }

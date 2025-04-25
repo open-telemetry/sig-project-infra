@@ -21,21 +21,22 @@ import (
 )
 
 type Server struct {
-	webhookSecret []byte // from env/config
+	webhookSecret []byte // from secrets config
 	mux           *http.ServeMux
 	server        *http.Server
 	app           *App    // Reference to the app for dispatching events
 }
 
-func NewServer(webhookSecret string, addr string) *Server {
-	return NewServerWithApp(webhookSecret, addr, nil)
+// NewServer creates a new server with the provided webhook secret and address
+func NewServer(addr string, secrets SecretConfig) *Server {
+	return NewServerWithApp(addr, secrets, nil)
 }
 
 // NewServerWithApp creates a server with a reference to the app
-func NewServerWithApp(webhookSecret string, addr string, app *App) *Server {
+func NewServerWithApp(addr string, secrets SecretConfig, app *App) *Server {
 	mux := http.NewServeMux()
 	srv := &Server{
-		webhookSecret: []byte(webhookSecret),
+		webhookSecret: []byte(secrets.GetWebhookSecret()),
 		mux:           mux,
 		server: &http.Server{
 			Addr:    fmt.Sprintf(":%v", addr),

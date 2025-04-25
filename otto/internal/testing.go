@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -17,7 +16,7 @@ import (
 // TestApp creates a test application with mock dependencies.
 func TestApp(t *testing.T) *App {
 	// Create temp config file
-	configFile, err := ioutil.TempFile("", "otto-test-config-*.yaml")
+	configFile, err := os.CreateTemp("", "otto-test-config-*.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
@@ -25,8 +24,7 @@ func TestApp(t *testing.T) *App {
 	defer os.Remove(configPath)
 	
 	// Write test config
-	config := `web_hook_secret: "test-secret"
-port: "8081"
+	config := `port: "8081"
 db_path: ":memory:"
 log:
   level: "info"
@@ -43,8 +41,29 @@ modules:
 		t.Fatalf("Failed to close test config file: %v", err)
 	}
 	
+	// Create temp secrets file
+	secretsFile, err := os.CreateTemp("", "otto-test-secrets-*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create test secrets file: %v", err)
+	}
+	secretsPath := secretsFile.Name()
+	defer os.Remove(secretsPath)
+	
+	// Write test secrets
+	secrets := `webhook_secret: "test-secret"
+github_app_id: 12345
+github_installation_id: 67890
+github_private_key_path: ""
+`
+	if _, err := secretsFile.Write([]byte(secrets)); err != nil {
+		t.Fatalf("Failed to write test secrets: %v", err)
+	}
+	if err := secretsFile.Close(); err != nil {
+		t.Fatalf("Failed to close test secrets file: %v", err)
+	}
+	
 	// Initialize test app
-	app, err := NewApp(context.Background(), configPath)
+	app, err := NewApp(context.Background(), configPath, secretsPath)
 	if err != nil {
 		t.Fatalf("Failed to create test app: %v", err)
 	}

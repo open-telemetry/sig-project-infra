@@ -17,10 +17,10 @@ import (
 
 // IsSlashCommand checks if a comment body contains a slash command.
 func IsSlashCommand(body string) bool {
-	lines := strings.SplitSeq(body, "\n")
-	for line := range lines {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "/") && len(line) > 1 && !strings.HasPrefix(line, "//") {
+		if strings.HasPrefix(line, "/") && !strings.HasPrefix(line, "//") {
 			return true
 		}
 	}

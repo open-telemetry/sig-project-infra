@@ -1,5 +1,8 @@
 version: 2
 
+# Force project name to be "otto"
+project_name: otto
+
 before:
   hooks:
     - go mod tidy
@@ -41,7 +44,7 @@ dockers:
 archives:
   - id: default
     name_template: >-
-      {{ .ProjectName }}_
+      otto_
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}

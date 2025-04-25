@@ -37,8 +37,8 @@ func (e *EnvManager) GetGitHubAppID() int64 {
 	envVal := os.Getenv("OTTO_GITHUB_APP_ID")
 	if envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}
@@ -50,8 +50,8 @@ func (e *EnvManager) GetGitHubInstallationID() int64 {
 	envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID")
 	if envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}
@@ -95,8 +95,8 @@ func (f *FileManager) GetWebhookSecret() string {
 func (f *FileManager) GetGitHubAppID() int64 {
 	if envVal := os.Getenv("OTTO_GITHUB_APP_ID"); envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}
@@ -107,8 +107,8 @@ func (f *FileManager) GetGitHubAppID() int64 {
 func (f *FileManager) GetGitHubInstallationID() int64 {
 	if envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID"); envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}
@@ -203,7 +203,7 @@ func (c *Chain) GetGitHubPrivateKey() []byte {
 		if m == nil {
 			continue
 		}
-		if v := m.GetGitHubPrivateKey(); v != nil && len(v) > 0 {
+		if v := m.GetGitHubPrivateKey(); len(v) > 0 {
 			return v
 		}
 	}

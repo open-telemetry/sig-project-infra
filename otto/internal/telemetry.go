@@ -105,7 +105,6 @@ var (
 	otelTracerProvider *sdktrace.TracerProvider
 	otelMeterProvider  *sdkmetric.MeterProvider
 	otelLoggerProvider *sdklog.LoggerProvider
-	ottoResource       *resource.Resource
 	rootLogger         *slog.Logger
 
 	metricsOnce            sync.Once
@@ -134,7 +133,6 @@ func InitTelemetry(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize otel resource: %w", err)
 	}
-	ottoResource = res
 
 	traceExporter, err := otlptracehttp.New(ctx)
 	if err != nil {

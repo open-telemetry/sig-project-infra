@@ -19,9 +19,6 @@ import (
 var (
 	LogAndWrapError  = internal.LogAndWrapError
 	ErrorTypeCommand = internal.ErrorTypeCommand
-
-	// lastCreatedTask is used for testing to track the most recently created task
-	lastCreatedTask *OnCallTask
 )
 
 type OnCallModule struct {
@@ -161,7 +158,7 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 
 	// Create the comment
 	comment := &github.IssueComment{
-		Body: github.String(message),
+		Body: github.Ptr(message),
 	}
 
 	// Create context

@@ -123,8 +123,8 @@ func (o *OnePasswordManager) GetGitHubAppID() int64 {
 	// Check environment variable first
 	if envVal := os.Getenv("OTTO_GITHUB_APP_ID"); envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}
@@ -155,8 +155,8 @@ func (o *OnePasswordManager) GetGitHubInstallationID() int64 {
 	// Check environment variable first
 	if envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID"); envVal != "" {
 		var id int64
-		fmt.Sscanf(envVal, "%d", &id)
-		if id > 0 {
+		_, err := fmt.Sscanf(envVal, "%d", &id)
+		if err == nil && id > 0 {
 			return id
 		}
 	}

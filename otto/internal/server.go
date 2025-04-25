@@ -52,7 +52,10 @@ func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Se
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`ok`))
+	_, err := w.Write([]byte(`ok`))
+	if err != nil {
+		slog.Error("Failed to write response", "error", err)
+	}
 }
 
 // handleWebhook verifies signature and decodes GitHub webhook request.

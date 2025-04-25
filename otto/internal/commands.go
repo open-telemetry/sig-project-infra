@@ -30,7 +30,7 @@ func IsSlashCommand(body string) bool {
 // LogSlashCommand logs information about a detected slash command for tracing purposes.
 func LogSlashCommand(ctx context.Context, command string, args []string, issuer, repo string, issueNum int) {
 	// Create a span for command logging
-	ctx, span := OttoTracer().Start(ctx, "otto.slash_command",
+	_, span := OttoTracer().Start(ctx, "otto.slash_command",
 		trace.WithAttributes(
 			attribute.String("repo", repo),
 			attribute.Int("issue_num", issueNum),

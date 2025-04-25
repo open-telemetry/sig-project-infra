@@ -5,6 +5,7 @@ package modules
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -245,7 +246,11 @@ func UpdateTaskStatus(db *sql.DB, id int64, status string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback() // Rollback in case of error, won't do anything if commit succeeds
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			slog.Error("Failed to rollback transaction", "error", err)
+		}
+	}() // Rollback in case of error, won't do anything if commit succeeds
 
 	// Execute the update
 	result, err := tx.Exec(

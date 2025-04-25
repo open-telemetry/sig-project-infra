@@ -11,6 +11,18 @@ import (
 	"sync"
 )
 
+// CommandContext represents a slash command invocation.
+type CommandContext struct {
+	Context  context.Context
+	Command  string   // e.g. "oncall"
+	Args     []string // parsed args
+	Issuer   string   // user who issued command
+	Repo     string
+	IssueNum int
+	RawBody  string // raw comment body, if needed
+	App      *App   // reference to the app instance
+}
+
 // Module is the Otto feature/module interface.
 type Module interface {
 	Name() string

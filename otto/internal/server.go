@@ -97,7 +97,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if s.app != nil {
 		s.app.DispatchEvent(eventType, event, payload)
 	} else {
-		slog.Error("no app reference in server, event dispatch failed")
+		slog.Error("No app reference in server, event dispatch failed")
 	}
 	
 	RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))

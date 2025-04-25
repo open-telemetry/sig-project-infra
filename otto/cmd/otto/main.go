@@ -26,20 +26,20 @@ func main() {
 	// Load configuration into global config
 	err := internal.LoadConfig(configPath)
 	if err != nil {
-		slog.Error("failed to load config", "err", err)
+		slog.Error("Failed to load config", "err", err)
 		os.Exit(1)
 	}
 
 	// Create and initialize application
 	app, err := internal.NewApp(ctx, configPath, secretsPath)
 	if err != nil {
-		slog.Error("failed to initialize application", "err", err)
+		slog.Error("Failed to initialize application", "err", err)
 		os.Exit(1)
 	}
 
 	// Start the application
 	if err := app.Start(ctx); err != nil {
-		slog.Error("failed to start application", "err", err)
+		slog.Error("Failed to start application", "err", err)
 		os.Exit(1)
 	}
 
@@ -58,7 +58,7 @@ func main() {
 
 	// Gracefully shut down the application
 	if err := app.Shutdown(ctxShutdown); err != nil {
-		slog.Error("error during application shutdown", "err", err)
+		slog.Error("Error during application shutdown", "err", err)
 	}
 
 	slog.Info("otto has been gracefully shut down")

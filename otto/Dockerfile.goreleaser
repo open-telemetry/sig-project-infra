@@ -1,0 +1,24 @@
+FROM scratch
+
+# Copy SSL certificates for HTTPS requests
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Set up the non-root user (needed for scratch image)
+# Since scratch has no shell, we need to create user in /etc/passwd directly
+COPY --from=alpine:latest /etc/passwd /etc/passwd
+COPY --from=alpine:latest /etc/group /etc/group
+
+# Copy the pre-built binary from the build stage
+COPY otto /usr/local/bin/otto
+
+# Expose the service port
+EXPOSE 8080
+
+# Set environment variables
+ENV OTTO_ADDR=:8080
+
+# Use non-root user
+USER nobody
+
+# Set the entry point
+ENTRYPOINT ["/usr/local/bin/otto"]

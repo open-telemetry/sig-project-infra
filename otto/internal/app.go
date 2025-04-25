@@ -84,7 +84,7 @@ func (a *App) Start(ctx context.Context) error {
 		}
 	}()
 
-	a.Logger.Info("otto started", "addr", a.Addr)
+	a.Logger.Info("otto started", "addr", a.Addr, "version", Version)
 	return nil
 }
 

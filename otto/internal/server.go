@@ -49,8 +49,9 @@ func NewServerWithApp(webhookSecret string, addr string, app *App) *Server {
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`ok`))
+	w.Write([]byte(fmt.Sprintf(`{"status":"ok","version":"%s"}`, Version)))
 }
 
 // handleWebhook verifies signature and decodes GitHub webhook request.

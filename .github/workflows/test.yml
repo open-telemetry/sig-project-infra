@@ -77,14 +77,14 @@ jobs:
       run: make build
       
     - name: Check GoReleaser config
-      uses: goreleaser/goreleaser-action@v5
+      uses: goreleaser/goreleaser-action@v6
       with:
         version: latest
         args: check
         workdir: ./otto
     
     - name: Test Docker build
-      uses: goreleaser/goreleaser-action@v5
+      uses: goreleaser/goreleaser-action@v6
       with:
         version: latest
         args: build --snapshot --clean --single-target

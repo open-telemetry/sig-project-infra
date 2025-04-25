@@ -48,11 +48,9 @@ archives:
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
-    # Use formats instead of format (deprecated)
     formats: [tar.gz]
     format_overrides:
       - goos: windows
-        # Use formats instead of format (deprecated)
         formats: [zip]
     files:
       - LICENSE*
@@ -63,7 +61,6 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# Use version_template instead of name_template for snapshot (deprecated)
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/sig-project-infra/otto/internal"
+	"github.com/open-telemetry/sig-project-infra/otto/internal/config"
 	_ "github.com/open-telemetry/sig-project-infra/otto/modules" // Import for side effects (module registration)
 )
 
@@ -20,11 +21,11 @@ func main() {
 	defer cancel()
 
 	// Load configuration paths from environment
-	configPath := internal.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
-	secretsPath := internal.GetEnvOrDefault("OTTO_SECRETS", "secrets.yaml")
+	configPath := config.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
+	secretsPath := config.GetEnvOrDefault("OTTO_SECRETS", "secrets.yaml")
 
 	// Load configuration into global config
-	err := internal.LoadConfig(configPath)
+	err := config.Load(configPath)
 	if err != nil {
 		slog.Error("Failed to load config", "err", err)
 		os.Exit(1)

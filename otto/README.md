@@ -22,23 +22,38 @@ Right now, the only feature is 'oncall', which helps manage on-call rotations fo
 
 ### Configuration
 
-Otto uses two separate configuration files:
+Otto supports several methods for configuration, with a focus on securely managing sensitive information.
 
-1. **config.yaml**: Non-sensitive application configuration
-   - Server port, database path, logging settings, module configuration
-   - See `config.example.yaml` for an example
+#### Application Configuration
 
-2. **secrets.yaml**: Sensitive authentication information
-   - GitHub webhook secret
-   - GitHub App credentials (app ID, installation ID, private key)
+**config.yaml**: Non-sensitive application configuration
+- Server port, database path, logging settings, module configuration
+- See `config.example.yaml` for an example
+
+#### Secrets Configuration
+
+Otto supports three methods for managing secrets, in order of preference:
+
+1. **1Password Integration**
+   - Securely stores secrets in a 1Password vault
+   - Requires 1Password account and Connect API:
+     - 1Password Connect Server (self-hosted or cloud)
+     - 1Password Connect API token
+   - Configure via `onepassword.example.yaml` and set `OTTO_1PASSWORD_CONFIG` env var
+   - Required env vars: `OTTO_1PASSWORD_URL`, `OTTO_1PASSWORD_TOKEN`
+
+2. **Secrets File**
+   - YAML file containing sensitive information (webhook secret, GitHub credentials)
    - See `secrets.example.yaml` for an example
+   - Use this for development or simple deployments
 
-You can also provide sensitive configuration via environment variables:
-
-- `OTTO_WEBHOOK_SECRET`: GitHub webhook secret
-- `OTTO_GITHUB_APP_ID`: GitHub App ID
-- `OTTO_GITHUB_INSTALLATION_ID`: GitHub App Installation ID
-- `OTTO_GITHUB_PRIVATE_KEY`: GitHub App private key (the actual key content)
+3. **Environment Variables**
+   - Fallback method that works with any deployment
+   - Available variables:
+     - `OTTO_WEBHOOK_SECRET`: GitHub webhook secret
+     - `OTTO_GITHUB_APP_ID`: GitHub App ID
+     - `OTTO_GITHUB_INSTALLATION_ID`: GitHub App Installation ID
+     - `OTTO_GITHUB_PRIVATE_KEY`: GitHub App private key (the actual key content)
 
 ### GitHub App Setup
 
@@ -72,18 +87,45 @@ OTTO_CONFIG=custom-config.yaml OTTO_SECRETS=custom-secrets.yaml ./otto
 
 ### Docker
 
-You can also run Otto using Docker:
+You can run Otto using Docker with any of the supported configuration methods:
+
+#### Using environment variables (recommended for production)
 
 ```bash
-# Build the Docker image
-docker build -t otto:latest .
+docker run -p 8080:8080 \
+  -v /path/to/config.yaml:/home/otto/config.yaml \
+  -e OTTO_WEBHOOK_SECRET="your_webhook_secret" \
+  -e OTTO_GITHUB_APP_ID="123456" \
+  -e OTTO_GITHUB_INSTALLATION_ID="789012" \
+  -e OTTO_GITHUB_PRIVATE_KEY="$(cat /path/to/private-key.pem)" \
+  otto:latest
+```
 
-# Run the container
+#### Using secrets file
+
+```bash
 docker run -p 8080:8080 \
   -v /path/to/config.yaml:/home/otto/config.yaml \
   -v /path/to/secrets.yaml:/home/otto/secrets.yaml \
   otto:latest
 ```
+
+#### Using 1Password Connect (most secure)
+
+```bash
+docker run -p 8080:8080 \
+  -v /path/to/config.yaml:/home/otto/config.yaml \
+  -v /path/to/onepassword.yaml:/home/otto/onepassword.yaml \
+  -e OTTO_1PASSWORD_CONFIG="/home/otto/onepassword.yaml" \
+  -e OTTO_1PASSWORD_URL="https://your-1password-connect-server" \
+  -e OTTO_1PASSWORD_TOKEN="your_1password_connect_token" \
+  otto:latest
+```
+
+This requires:
+1. A 1Password Connect server (either self-hosted or using 1Password Cloud)
+2. A 1Password Connect API token
+3. Items in your 1Password vault for each secret (webhook secret, GitHub App credentials)
 
 ## Contributing
 

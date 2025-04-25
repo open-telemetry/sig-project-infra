@@ -9,6 +9,8 @@ import (
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"sync"
+	
+	"github.com/open-telemetry/sig-project-infra/otto/internal/config"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 func InitDB() (*sql.DB, error) {
 	var err error
 	dbOnce.Do(func() {
-		dbPath := GlobalConfig.DBPath
+		dbPath := config.Global.DBPath
 		db, err = sql.Open("sqlite3", dbPath)
 		if err != nil {
 			err = fmt.Errorf("failed to open database: %w", err)

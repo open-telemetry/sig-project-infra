@@ -11,13 +11,15 @@ import (
 
 	"github.com/google/go-github/v71/github"
 	"github.com/jferrl/go-githubauth"
+	"github.com/open-telemetry/sig-project-infra/otto/internal/config"
+	"github.com/open-telemetry/sig-project-infra/otto/internal/secrets"
 	"golang.org/x/oauth2"
 )
 
 // App encapsulates all application dependencies
 type App struct {
-	Config         *AppConfig
-	Secrets        SecretConfig
+	Config         *config.AppConfig
+	Secrets        secrets.Manager
 	DB             *sql.DB
 	Logger         *slog.Logger
 	Addr           string
@@ -29,22 +31,22 @@ type App struct {
 // NewApp creates and initializes a new application instance
 func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	// Load configuration
-	config, err := LoadConfigFromFile(configPath)
+	appConfig, err := config.LoadFromFile(configPath)
 	if err != nil {
 		return nil, err
 	}
 	
 	// Load secrets
-	secrets, err := LoadSecrets(secretsPath)
+	secretsManager, err := secrets.LoadSecrets(secretsPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize app with config
 	app := &App{
-		Config:         config,
-		Secrets:        secrets,
-		Addr:           config.Port,
+		Config:         appConfig,
+		Secrets:        secretsManager,
+		Addr:           appConfig.Port,
 		shutdownSignal: make(chan struct{}),
 	}
 	

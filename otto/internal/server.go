@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v71/github"
+	"github.com/open-telemetry/sig-project-infra/otto/internal/secrets"
 )
 
 type Server struct {
@@ -28,15 +29,15 @@ type Server struct {
 }
 
 // NewServer creates a new server with the provided webhook secret and address
-func NewServer(addr string, secrets SecretConfig) *Server {
-	return NewServerWithApp(addr, secrets, nil)
+func NewServer(addr string, secretsManager secrets.Manager) *Server {
+	return NewServerWithApp(addr, secretsManager, nil)
 }
 
 // NewServerWithApp creates a server with a reference to the app
-func NewServerWithApp(addr string, secrets SecretConfig, app *App) *Server {
+func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Server {
 	mux := http.NewServeMux()
 	srv := &Server{
-		webhookSecret: []byte(secrets.GetWebhookSecret()),
+		webhookSecret: []byte(secretsManager.GetWebhookSecret()),
 		mux:           mux,
 		server: &http.Server{
 			Addr:    fmt.Sprintf(":%v", addr),

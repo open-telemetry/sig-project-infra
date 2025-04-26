@@ -19,6 +19,10 @@ builds:
     goarch:
       - amd64
       - arm64
+    # Ignore combinations that don't exist
+    ignore:
+      - goos: darwin
+        goarch: 386
     flags:
       - -trimpath
     ldflags:
@@ -26,20 +30,50 @@ builds:
 
 dockers:
   - image_templates:
-      - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}"
-      - "ghcr.io/open-telemetry/sig-project-infra/otto:latest"
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-amd64"
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:latest-amd64"
     dockerfile: Dockerfile.goreleaser
-    ids:
-      - otto
+    use: docker
     build_flag_templates:
       - "--pull"
+      - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
       - "--label=org.opencontainers.image.title=Otto"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source=https://github.com/open-telemetry/sig-project-infra"
       - "--label=org.opencontainers.image.licenses=Apache-2.0"
+    ids:
+      - otto
+
+  - image_templates:
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-arm64"
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:latest-arm64"
+    dockerfile: Dockerfile.goreleaser
     use: docker
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title=Otto"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/open-telemetry/sig-project-infra"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+    goarch: arm64
+    ids:
+      - otto
+
+# Add docker manifests as suggested by adrielp
+docker_manifests:
+  - name_template: ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}
+    image_templates:
+      - ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-amd64
+      - ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-arm64
+  - name_template: ghcr.io/open-telemetry/sig-project-infra/otto:latest
+    image_templates:
+      - ghcr.io/open-telemetry/sig-project-infra/otto:latest-amd64
+      - ghcr.io/open-telemetry/sig-project-infra/otto:latest-arm64
 
 archives:
   - id: default

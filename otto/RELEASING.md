@@ -45,10 +45,35 @@ docker pull ghcr.io/open-telemetry/sig-project-infra/otto:v1.0.0
 docker pull ghcr.io/open-telemetry/sig-project-infra/otto:latest
 ```
 
+### Verifying Signatures
+
+Otto releases are signed using Cosign. You can verify the signatures using the public key.
+
+To verify binary checksums:
+
+```sh
+# Download the public key
+curl -O https://raw.githubusercontent.com/open-telemetry/sig-project-infra/main/otto/cosign.pub
+
+# Verify checksums
+cosign verify-blob --key cosign.pub --signature checksums.txt.sig checksums.txt
+```
+
+To verify Docker images:
+
+```sh
+# Verify a specific version
+cosign verify --key cosign.pub ghcr.io/open-telemetry/sig-project-infra/otto:v1.0.0
+
+# Verify latest
+cosign verify --key cosign.pub ghcr.io/open-telemetry/sig-project-infra/otto:latest
+```
+
 ### Future Improvements
 
 Planned improvements to the release process:
 
-- Add binary and Docker image signing/attestations
-- Explore GitHub Actions workflows for release authorization
+- Further enhance security with SBOM generation and attestations
+- Explore OpenTelemetry Collector's GoReleaser Pro features for improved build times
 - Implement automatic changelog generation based on PR content
+- Add user-friendly release verification and installation instructions

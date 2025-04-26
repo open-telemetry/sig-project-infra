@@ -3,6 +3,18 @@ version: 2
 # Force project name to be "otto"
 project_name: otto
 
+# Signing configuration for binaries
+signs:
+  - cmd: cosign
+    args:
+      - "sign-blob"
+      - "--key=${env.COSIGN_KEY}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+    artifacts: checksum
+    stdin: '{{ .Env.COSIGN_PASSWORD }}'
+    signature: "${artifact}.sig"
+
 before:
   hooks:
     - go mod tidy
@@ -74,6 +86,16 @@ docker_manifests:
     image_templates:
       - ghcr.io/open-telemetry/sig-project-infra/otto:latest-amd64
       - ghcr.io/open-telemetry/sig-project-infra/otto:latest-arm64
+
+# Docker image signing configuration
+docker_signs:
+  - cmd: cosign
+    args:
+      - "sign"
+      - "--key=${env.COSIGN_KEY}"
+      - "${artifact}"
+    artifacts: images
+    stdin: '{{ .Env.COSIGN_PASSWORD }}'
 
 archives:
   - id: default

@@ -131,6 +131,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Install cosign for artifact signing
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.4.0
+        with:
+          cosign-release: 'v2.2.2'
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -140,3 +146,6 @@ jobs:
           workdir: ./otto
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # These secrets need to be set in the repository settings
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}

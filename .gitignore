@@ -1,2 +1,16 @@
 otto/config.yaml
 otto/.env
+
+# MacOS
+.DS_Store
+
+# Python and Ansible
+venv
+.venv
+.vscode
+.vagrant
+inventory.yml
+playbook/debug.yml
+.vault_pass
+.vault*
+

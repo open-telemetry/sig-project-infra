@@ -1,0 +1,99 @@
+---
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: gh-metrics
+  namespace: otel-collectors
+spec:
+  image: ghcr.io/liatrio/liatrio-otel-collector:0.86.0-amd64
+  mode: deployment
+  env:
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+  envFrom:
+    - secretRef:
+        name: github-app-ids
+        optional: false
+    - secretRef:
+        name: honeycomb-ingest
+        optional: false
+
+  volumes:
+    - secret:
+        secretName: github-app-creds
+        items:
+          - key: GITHUB_APP_PRIVATE_KEY_FILE
+            path: gh-app-private-key.pem
+      name: app-key-volume
+  volumeMounts:
+    - name: app-key-volume
+      mountPath: /etc/app-key-volume
+      readOnly: true
+  config:
+    extensions:
+      health_check:
+        endpoint: "${env:POD_IP}:13133"
+
+      githubappauth:
+        app_id: ${env:GITHUB_APP_ID}
+        installation_id: ${env:GITHUB_APP_INSTALL_ID}
+        private_key_file: /etc/app-key-volume/gh-app-private-key.pem
+
+    receivers:
+      github:
+        initial_delay: 1s
+        collection_interval: 120m
+        scrapers:
+          scraper:
+            metrics:
+              vcs.contributor.count:
+                enabled: true
+            github_org: open-telemetry
+            search_query: "repo:open-telemetry/opentelemetry-collector repo:open-telemetry/opentelemetry-collector-contrib repo:open-telemetry/semantic-conventions  repo:open-telemetry/opentelemetry-collector-releases repo:open-telemetry/weaver"
+            auth:
+              authenticator: githubappauth
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+
+      batch:
+        send_batch_size: 100
+        timeout: 10s
+
+    exporters:
+      debug:
+        verbosity: basic
+        sampling_initial: 2
+        sampling_thereafter: 500
+
+      otlp/signoz:
+        endpoint: signoz-otel-collector.signoz:4317
+        tls:
+          insecure: true
+
+      otlp/honeycomb:
+        endpoint: api.honeycomb.io:443
+        headers:
+          x-honeycomb-team: ${env:HONEYCOMB_INGEST_KEY}
+          x-honeycomb-dataset: vcs-metrics
+
+    service:
+      extensions:
+        - health_check
+        - githubappauth
+      pipelines:
+        metrics:
+          receivers:
+            - github
+          processors:
+            - memory_limiter
+            - batch
+          exporters:
+            - debug
+            - otlp/signoz
+            - otlp/honeycomb

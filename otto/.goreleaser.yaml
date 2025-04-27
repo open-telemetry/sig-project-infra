@@ -12,7 +12,7 @@ signs:
       - "--output-signature=${signature}"
       - "${artifact}"
     artifacts: checksum
-    stdin: '{{ .Env.COSIGN_PASSWORD }}'
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
     signature: "${artifact}.sig"
 
 before:
@@ -34,7 +34,7 @@ builds:
     # Ignore combinations that don't exist
     ignore:
       - goos: darwin
-        goarch: 386
+        goarch: "386"
     flags:
       - -trimpath
     ldflags:
@@ -95,7 +95,7 @@ docker_signs:
       - "--key=${env.COSIGN_KEY}"
       - "${artifact}"
     artifacts: images
-    stdin: '{{ .Env.COSIGN_PASSWORD }}'
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
 
 archives:
   - id: default

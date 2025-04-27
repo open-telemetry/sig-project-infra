@@ -1,0 +1,17 @@
+name: Otto Conventional Commits
+
+on:
+  pull_request:
+    paths:
+      - 'otto/**'
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Conventional Commits
+        uses: ytanikin/pr-conventional-commits@v1.1.0
+        with:
+          allowed_scopes: "otto,repo,ci,docs"
+          allowed_types: "build,chore,ci,docs,feat,fix,perf,refactor,revert,style,test"

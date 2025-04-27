@@ -43,43 +43,25 @@ jobs:
           
           echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
       
-      - name: Determine version
-        id: next_version
-        run: |
-          # Get latest tag or use v0.0.0 as base if none exists
-          git fetch --tags
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
-          
-          # Strip 'v' prefix
-          CURRENT_VERSION=${LATEST_TAG#v}
-          
-          # Split into major, minor, patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
-          # Increment based on release type
-          RELEASE_TYPE="${{ steps.release_type.outputs.release_type }}"
-          if [ "$RELEASE_TYPE" = "major" ]; then
-            MAJOR=$((MAJOR + 1))
-            MINOR=0
-            PATCH=0
-          elif [ "$RELEASE_TYPE" = "minor" ]; then
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          else
-            PATCH=$((PATCH + 1))
-          fi
-          
-          # Create new version string
-          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version will be: $NEW_VERSION"
+      - name: Calculate next version with svu
+        id: svu
+        uses: charlesthomas/github-action-svu@v1.0.2
+        with:
+          type: ${{ steps.release_type.outputs.release_type }}
+          working-directory: otto
+          # Ensure prefix is set correctly
+          prefix: "v"
+          # Handle case when no previous tags exist
+          fallback: "0.1.0"
+          # Use the same configuration as in .svu.yml
+          metadata: false
+          pre: false
       
       - name: Create tag
         id: create_tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ steps.next_version.outputs.new_version }}
+          NEW_VERSION: v${{ steps.svu.outputs.version }}
         run: |
           # Extract PR title and body for release notes
           PR_TITLE="${{ github.event.pull_request.title }}"

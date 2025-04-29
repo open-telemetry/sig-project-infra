@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package config handles loading and managing configuration for Otto.
 package config
 
 import (

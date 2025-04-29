@@ -3,22 +3,15 @@
 package secrets
 
 import (
-	"os"
 	"testing"
 )
 
 func TestEnvManager(t *testing.T) {
 	// Set environment variables
-	os.Setenv("OTTO_WEBHOOK_SECRET", "test-webhook-secret")
-	os.Setenv("OTTO_GITHUB_APP_ID", "54321")
-	os.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
-	os.Setenv("OTTO_GITHUB_PRIVATE_KEY", "test-private-key")
-	defer func() {
-		os.Unsetenv("OTTO_WEBHOOK_SECRET")
-		os.Unsetenv("OTTO_GITHUB_APP_ID")
-		os.Unsetenv("OTTO_GITHUB_INSTALLATION_ID")
-		os.Unsetenv("OTTO_GITHUB_PRIVATE_KEY")
-	}()
+	t.Setenv("OTTO_WEBHOOK_SECRET", "test-webhook-secret")
+	t.Setenv("OTTO_GITHUB_APP_ID", "54321")
+	t.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
+	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "test-private-key")
 
 	// Create env manager
 	envManager := &EnvManager{}
@@ -77,16 +70,10 @@ func TestFileManager(t *testing.T) {
 
 func TestFileManagerWithEnv(t *testing.T) {
 	// Set environment variables
-	os.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
-	os.Setenv("OTTO_GITHUB_APP_ID", "54321")
-	os.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
-	os.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
-	defer func() {
-		os.Unsetenv("OTTO_WEBHOOK_SECRET")
-		os.Unsetenv("OTTO_GITHUB_APP_ID")
-		os.Unsetenv("OTTO_GITHUB_INSTALLATION_ID")
-		os.Unsetenv("OTTO_GITHUB_PRIVATE_KEY")
-	}()
+	t.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
+	t.Setenv("OTTO_GITHUB_APP_ID", "54321")
+	t.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
+	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
 
 	// Create file manager
 	fileManager := NewFileManager(
@@ -179,16 +166,10 @@ func TestChain(t *testing.T) {
 	)
 
 	// Set environment variables
-	os.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
-	os.Setenv("OTTO_GITHUB_APP_ID", "54321")
-	os.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
-	os.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
-	defer func() {
-		os.Unsetenv("OTTO_WEBHOOK_SECRET")
-		os.Unsetenv("OTTO_GITHUB_APP_ID")
-		os.Unsetenv("OTTO_GITHUB_INSTALLATION_ID")
-		os.Unsetenv("OTTO_GITHUB_PRIVATE_KEY")
-	}()
+	t.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
+	t.Setenv("OTTO_GITHUB_APP_ID", "54321")
+	t.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
+	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
 
 	envManager := &EnvManager{}
 

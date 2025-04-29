@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package internal provides shared infrastructure for otto.
-//
 // telemetry.go sets up OpenTelemetry metrics, traces, and logs, bridging slog.
-
 package internal
 
 import (
@@ -12,16 +10,13 @@ import (
 	"log/slog"
 	"sync"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
-
-	"go.opentelemetry.io/otel"
-	otelmetric "go.opentelemetry.io/otel/metric"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -83,7 +78,7 @@ func InitOttoMetrics() {
 	})
 }
 
-// Server metrics helpers.
+// IncServerRequest records an HTTP request in server metrics.
 func IncServerRequest(ctx context.Context, handler string) {
 	serverRequests.Add(ctx, 1, metric.WithAttributes(attribute.String("handler", handler)))
 }
@@ -104,7 +99,7 @@ func RecordServerLatency(ctx context.Context, handler string, ms float64) {
 	serverLatencyHistogram.Record(ctx, ms, metric.WithAttributes(attribute.String("handler", handler)))
 }
 
-// Module metrics helpers.
+// IncModuleCommand records a module command execution in metrics.
 func IncModuleCommand(ctx context.Context, module, command string) {
 	moduleCommands.Add(
 		ctx,
@@ -125,7 +120,7 @@ func RecordAckLatency(ctx context.Context, module string, ms float64) {
 	moduleAckLatency.Record(ctx, ms, metric.WithAttributes(attribute.String("module", module)))
 }
 
-// Tracing helpers.
+// StartServerEventSpan creates a new tracing span for server event handling.
 func StartServerEventSpan(ctx context.Context, eventType string) (context.Context, trace.Span) {
 	return OttoTracer().Start(ctx, "server.handle_"+eventType)
 }
@@ -211,12 +206,12 @@ func InitTelemetry(ctx context.Context) error {
 }
 
 // OttoTracer returns the tracer for Otto modules.
-func OttoTracer() oteltrace.Tracer {
+func OttoTracer() trace.Tracer {
 	return otel.Tracer("otto")
 }
 
 // OttoMeter returns the meter for Otto modules.
-func OttoMeter() otelmetric.Meter {
+func OttoMeter() metric.Meter {
 	return otel.Meter("otto")
 }
 

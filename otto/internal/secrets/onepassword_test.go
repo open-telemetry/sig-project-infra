@@ -46,16 +46,10 @@ func TestOnePasswordManagerEnvironmentFallback(t *testing.T) {
 	}
 
 	// Set environment variables
-	os.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
-	os.Setenv("OTTO_GITHUB_APP_ID", "54321")
-	os.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
-	os.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
-	defer func() {
-		os.Unsetenv("OTTO_WEBHOOK_SECRET")
-		os.Unsetenv("OTTO_GITHUB_APP_ID")
-		os.Unsetenv("OTTO_GITHUB_INSTALLATION_ID")
-		os.Unsetenv("OTTO_GITHUB_PRIVATE_KEY")
-	}()
+	t.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
+	t.Setenv("OTTO_GITHUB_APP_ID", "54321")
+	t.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
+	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
 
 	// Skip test if token is not available
 	token := os.Getenv("OTTO_1PASSWORD_TOKEN")

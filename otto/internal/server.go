@@ -40,8 +40,9 @@ func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Se
 		webhookSecret: []byte(secretsManager.GetWebhookSecret()),
 		mux:           mux,
 		server: &http.Server{
-			Addr:    fmt.Sprintf(":%v", addr),
-			Handler: mux,
+			Addr:              fmt.Sprintf(":%v", addr),
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
 		},
 		app: app,
 	}

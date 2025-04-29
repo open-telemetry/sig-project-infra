@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	// Import sqlite driver for database/sql.
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/open-telemetry/sig-project-infra/otto/internal/config"

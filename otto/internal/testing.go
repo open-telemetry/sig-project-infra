@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	// Import sqlite driver for database/sql.
 	_ "github.com/mattn/go-sqlite3"
 )
 

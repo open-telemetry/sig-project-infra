@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package modules contains implementations of the various Otto modules.
 package modules
 
 import (

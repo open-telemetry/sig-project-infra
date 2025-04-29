@@ -80,8 +80,7 @@ func TestApplyDefaults(t *testing.T) {
 
 func TestGetEnvOrDefault(t *testing.T) {
 	// Set a test environment variable
-	os.Setenv("TEST_ENV_VAR", "test-value")
-	defer os.Unsetenv("TEST_ENV_VAR")
+	t.Setenv("TEST_ENV_VAR", "test-value")
 
 	// Test with existing environment variable
 	if got := GetEnvOrDefault("TEST_ENV_VAR", "default"); got != "test-value" {

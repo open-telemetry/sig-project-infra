@@ -14,10 +14,14 @@ type OnCallUser struct {
 
 type OnCallScheduleRotationPolicy string
 
+// Rotation policy constants define different ways to rotate on-call schedules.
 const (
+	// RoundRobinPolicy assigns tasks in a circular rotation through all users.
 	RoundRobinPolicy OnCallScheduleRotationPolicy = "round-robin"
+	// SequentialPolicy assigns tasks in order by position.
 	SequentialPolicy OnCallScheduleRotationPolicy = "sequential"
-	RandomPolicy     OnCallScheduleRotationPolicy = "random"
+	// RandomPolicy assigns tasks randomly among users.
+	RandomPolicy OnCallScheduleRotationPolicy = "random"
 )
 
 type OnCallSchedule struct {

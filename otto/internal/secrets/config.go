@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package secrets provides secure storage and retrieval of sensitive configuration.
 package secrets
 
 import (

@@ -15,9 +15,9 @@ type OnCallUser struct {
 type OnCallScheduleRotationPolicy string
 
 const (
-	RoundRobinPolicy   OnCallScheduleRotationPolicy = "round-robin"
-	SequentialPolicy   OnCallScheduleRotationPolicy = "sequential"
-	RandomPolicy       OnCallScheduleRotationPolicy = "random"
+	RoundRobinPolicy OnCallScheduleRotationPolicy = "round-robin"
+	SequentialPolicy OnCallScheduleRotationPolicy = "sequential"
+	RandomPolicy     OnCallScheduleRotationPolicy = "random"
 )
 
 type OnCallSchedule struct {

@@ -3,26 +3,25 @@
 package internal
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
-	
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestApp creates a test application with mock dependencies.
 func TestApp(t *testing.T) *App {
 	// Create temp config file
-	configFile, err := os.CreateTemp("", "otto-test-config-*.yaml")
+	configFile, err := os.CreateTemp(t.TempDir(), "otto-test-config-*.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 	configPath := configFile.Name()
 	defer os.Remove(configPath)
-	
+
 	// Write test config
 	config := `port: "8081"
 db_path: ":memory:"
@@ -40,15 +39,15 @@ modules:
 	if err := configFile.Close(); err != nil {
 		t.Fatalf("Failed to close test config file: %v", err)
 	}
-	
+
 	// Create temp secrets file
-	secretsFile, err := os.CreateTemp("", "otto-test-secrets-*.yaml")
+	secretsFile, err := os.CreateTemp(t.TempDir(), "otto-test-secrets-*.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create test secrets file: %v", err)
 	}
 	secretsPath := secretsFile.Name()
 	defer os.Remove(secretsPath)
-	
+
 	// Write test secrets
 	secrets := `webhook_secret: "test-secret"
 github_app_id: 12345
@@ -61,13 +60,13 @@ github_private_key_path: ""
 	if err := secretsFile.Close(); err != nil {
 		t.Fatalf("Failed to close test secrets file: %v", err)
 	}
-	
+
 	// Initialize test app
-	app, err := NewApp(context.Background(), configPath, secretsPath)
+	app, err := NewApp(t.Context(), configPath, secretsPath)
 	if err != nil {
 		t.Fatalf("Failed to create test app: %v", err)
 	}
-	
+
 	return app
 }
 
@@ -77,13 +76,13 @@ func TestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	
+
 	// Ensure the connection works
 	if err := db.Ping(); err != nil {
 		db.Close()
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
-	
+
 	return db
 }
 
@@ -125,7 +124,7 @@ func NewMockModule(name string) *MockModule {
 	return &MockModule{name: name}
 }
 
-// GitHubWebhookPayload represents a structured GitHub webhook event for testing
+// GitHubWebhookPayload represents a structured GitHub webhook event for testing.
 type GitHubWebhookPayload struct {
 	Action       string                 `json:"action"`
 	Issue        map[string]interface{} `json:"issue,omitempty"`
@@ -137,7 +136,7 @@ type GitHubWebhookPayload struct {
 	Organization map[string]interface{} `json:"organization,omitempty"`
 }
 
-// CreateTestWebhookPayload generates a simulated GitHub webhook payload
+// CreateTestWebhookPayload generates a simulated GitHub webhook payload.
 func CreateTestWebhookPayload(eventType string, options map[string]interface{}) ([]byte, error) {
 	payload := GitHubWebhookPayload{
 		Action: options["action"].(string),
@@ -185,7 +184,7 @@ func CreateTestWebhookPayload(eventType string, options map[string]interface{}) 
 	return json.Marshal(payload)
 }
 
-// SimulateWebhookEvent simulates sending a GitHub webhook event to the application
+// SimulateWebhookEvent simulates sending a GitHub webhook event to the application.
 func (a *App) SimulateWebhookEvent(eventType string, options map[string]interface{}) error {
 	payload, err := CreateTestWebhookPayload(eventType, options)
 	if err != nil {

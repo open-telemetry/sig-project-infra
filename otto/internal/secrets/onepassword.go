@@ -4,6 +4,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,13 +15,13 @@ import (
 
 // OnePasswordManager implements the Manager interface using 1Password Connect.
 type OnePasswordManager struct {
-	client            *onepassword.Client
-	webhookSecretRef  string
-	appIDRef          string
-	installIDRef      string
-	privateKeyRef     string
-	refs              map[string]string
-	cachedValues      map[string]string
+	client           *onepassword.Client
+	webhookSecretRef string
+	appIDRef         string
+	installIDRef     string
+	privateKeyRef    string
+	refs             map[string]string
+	cachedValues     map[string]string
 }
 
 // NewOnePasswordManager creates a new OnePasswordManager with the given references.
@@ -29,9 +30,9 @@ func NewOnePasswordManager(webhookRef, appIDRef, installIDRef, privateKeyRef str
 	// Get token from environment variables
 	token := os.Getenv("OTTO_1PASSWORD_TOKEN")
 	if token == "" {
-		return nil, fmt.Errorf("OTTO_1PASSWORD_TOKEN environment variable is required")
+		return nil, errors.New("OTTO_1PASSWORD_TOKEN environment variable is required")
 	}
-	
+
 	// Create the client
 	client, err := onepassword.NewClient(context.Background(),
 		onepassword.WithServiceAccountToken(token),
@@ -40,42 +41,44 @@ func NewOnePasswordManager(webhookRef, appIDRef, installIDRef, privateKeyRef str
 	if err != nil {
 		return nil, fmt.Errorf("unable to create 1Password client: %w", err)
 	}
-	
+
 	// Create and return the manager
 	manager := &OnePasswordManager{
-		client:            client,
-		webhookSecretRef:  webhookRef,
-		appIDRef:          appIDRef,
-		installIDRef:      installIDRef,
-		privateKeyRef:     privateKeyRef,
-		refs:              make(map[string]string),
-		cachedValues:      make(map[string]string),
+		client:           client,
+		webhookSecretRef: webhookRef,
+		appIDRef:         appIDRef,
+		installIDRef:     installIDRef,
+		privateKeyRef:    privateKeyRef,
+		refs:             make(map[string]string),
+		cachedValues:     make(map[string]string),
 	}
-	
+
 	// Validate references
 	if err := manager.validateReferences(); err != nil {
 		return nil, err
 	}
-	
+
 	return manager, nil
 }
 
 // validateReferences checks that the references are valid.
 func (o *OnePasswordManager) validateReferences() error {
 	if o.webhookSecretRef == "" {
-		return fmt.Errorf("webhook secret reference is required")
+		return errors.New("webhook secret reference is required")
 	}
-	
+
 	// Either all GitHub App references must be present, or none
 	hasAppID := o.appIDRef != ""
 	hasInstallID := o.installIDRef != ""
 	hasPrivateKey := o.privateKeyRef != ""
-	
-	if (hasAppID || hasInstallID || hasPrivateKey) && 
-	   !(hasAppID && hasInstallID && hasPrivateKey) {
-		return fmt.Errorf("github_app_id_ref, github_installation_id_ref, and github_private_key_ref must all be set for GitHub App authentication")
+
+	if (hasAppID || hasInstallID || hasPrivateKey) &&
+		(!hasAppID || !hasInstallID || !hasPrivateKey) {
+		return errors.New(
+			"github_app_id_ref, github_installation_id_ref, and github_private_key_ref must all be set for GitHub App authentication",
+		)
 	}
-	
+
 	return nil
 }
 
@@ -85,16 +88,16 @@ func (o *OnePasswordManager) resolveReference(ctx context.Context, ref string) (
 	if val, ok := o.cachedValues[ref]; ok {
 		return val, nil
 	}
-	
+
 	// Resolve the reference
 	value, err := o.client.Secrets().Resolve(ctx, ref)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve reference %s: %w", ref, err)
 	}
-	
+
 	// Cache the value
 	o.cachedValues[ref] = value
-	
+
 	return value, nil
 }
 
@@ -104,7 +107,7 @@ func (o *OnePasswordManager) GetWebhookSecret() string {
 	if envVal := os.Getenv("OTTO_WEBHOOK_SECRET"); envVal != "" {
 		return envVal
 	}
-	
+
 	// Get the webhook secret from 1Password
 	if o.webhookSecretRef != "" {
 		val, err := o.resolveReference(context.Background(), o.webhookSecretRef)
@@ -114,7 +117,7 @@ func (o *OnePasswordManager) GetWebhookSecret() string {
 		}
 		return val
 	}
-	
+
 	return ""
 }
 
@@ -128,7 +131,7 @@ func (o *OnePasswordManager) GetGitHubAppID() int64 {
 			return id
 		}
 	}
-	
+
 	// Get the app ID from 1Password
 	if o.appIDRef != "" {
 		val, err := o.resolveReference(context.Background(), o.appIDRef)
@@ -136,17 +139,17 @@ func (o *OnePasswordManager) GetGitHubAppID() int64 {
 			slog.Error("Failed to retrieve GitHub App ID from 1Password", "error", err)
 			return 0
 		}
-		
+
 		// Parse the ID
 		id, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
 			slog.Error("Failed to parse GitHub App ID", "error", err)
 			return 0
 		}
-		
+
 		return id
 	}
-	
+
 	return 0
 }
 
@@ -160,7 +163,7 @@ func (o *OnePasswordManager) GetGitHubInstallationID() int64 {
 			return id
 		}
 	}
-	
+
 	// Get the installation ID from 1Password
 	if o.installIDRef != "" {
 		val, err := o.resolveReference(context.Background(), o.installIDRef)
@@ -168,17 +171,17 @@ func (o *OnePasswordManager) GetGitHubInstallationID() int64 {
 			slog.Error("Failed to retrieve GitHub Installation ID from 1Password", "error", err)
 			return 0
 		}
-		
+
 		// Parse the ID
 		id, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
 			slog.Error("Failed to parse GitHub Installation ID", "error", err)
 			return 0
 		}
-		
+
 		return id
 	}
-	
+
 	return 0
 }
 
@@ -188,7 +191,7 @@ func (o *OnePasswordManager) GetGitHubPrivateKey() []byte {
 	if envVal := os.Getenv("OTTO_GITHUB_PRIVATE_KEY"); envVal != "" {
 		return []byte(envVal)
 	}
-	
+
 	// Get the private key from 1Password
 	if o.privateKeyRef != "" {
 		val, err := o.resolveReference(context.Background(), o.privateKeyRef)
@@ -196,10 +199,10 @@ func (o *OnePasswordManager) GetGitHubPrivateKey() []byte {
 			slog.Error("Failed to retrieve GitHub private key from 1Password", "error", err)
 			return nil
 		}
-		
+
 		return []byte(val)
 	}
-	
+
 	return nil
 }
 
@@ -207,9 +210,9 @@ func (o *OnePasswordManager) GetGitHubPrivateKey() []byte {
 func LoadOnePasswordConfig(path string) (*OnePasswordManager, error) {
 	// Read the configuration file
 	slog.Info("Loading 1Password configuration from file", "path", path)
-	
+
 	// Parse op:// references
 	// For now, this is a placeholder. In a complete implementation,
 	// this would parse a YAML config file with the op:// references.
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }

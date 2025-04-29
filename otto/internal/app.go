@@ -16,26 +16,26 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// App encapsulates all application dependencies
+// App encapsulates all application dependencies.
 type App struct {
 	Config         *config.AppConfig
 	Secrets        secrets.Manager
 	DB             *sql.DB
 	Logger         *slog.Logger
 	Addr           string
-	GitHubClient   *github.Client  // GitHub API client for interacting with GitHub
+	GitHubClient   *github.Client // GitHub API client for interacting with GitHub
 	server         *Server
 	shutdownSignal chan struct{}
 }
 
-// NewApp creates and initializes a new application instance
+// NewApp creates and initializes a new application instance.
 func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	// Load configuration
 	appConfig, err := config.LoadFromFile(configPath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Load secrets
 	secretsManager, err := secrets.LoadSecrets(secretsPath)
 	if err != nil {
@@ -49,7 +49,7 @@ func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 		Addr:           appConfig.Port,
 		shutdownSignal: make(chan struct{}),
 	}
-	
+
 	// Initialize GitHub client
 	if err := app.initializeGitHubClient(ctx); err != nil {
 		return nil, fmt.Errorf("failed to initialize GitHub client: %w", err)
@@ -75,7 +75,7 @@ func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	return app, nil
 }
 
-// Start begins all application services
+// Start begins all application services.
 func (a *App) Start(ctx context.Context) error {
 	// Initialize and start all modules
 	if err := a.initializeModules(ctx); err != nil {
@@ -93,7 +93,7 @@ func (a *App) Start(ctx context.Context) error {
 	return nil
 }
 
-// Shutdown gracefully stops all application services
+// Shutdown gracefully stops all application services.
 func (a *App) Shutdown(ctx context.Context) error {
 	// Shutdown server
 	if err := a.server.Shutdown(ctx); err != nil {
@@ -120,21 +120,21 @@ func (a *App) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// WaitForShutdown blocks until the application is signaled to shut down
+// WaitForShutdown blocks until the application is signaled to shut down.
 func (a *App) WaitForShutdown() {
 	<-a.shutdownSignal
 }
 
-// SignalShutdown triggers the application to begin shutting down
+// SignalShutdown triggers the application to begin shutting down.
 func (a *App) SignalShutdown() {
 	close(a.shutdownSignal)
 }
 
-// initializeModules initializes all registered modules
+// initializeModules initializes all registered modules.
 func (a *App) initializeModules(ctx context.Context) error {
 	// Get all registered modules
 	modules := GetModules()
-	
+
 	for name, mod := range modules {
 		if initializer, ok := mod.(ModuleInitializer); ok {
 			if err := initializer.Initialize(ctx, a); err != nil {
@@ -146,11 +146,11 @@ func (a *App) initializeModules(ctx context.Context) error {
 	return nil
 }
 
-// shutdownModules gracefully shuts down all modules
+// shutdownModules gracefully shuts down all modules.
 func (a *App) shutdownModules(ctx context.Context) error {
 	// Get all registered modules
 	modules := GetModules()
-	
+
 	var wg sync.WaitGroup
 	errors := make(chan error, len(modules))
 
@@ -180,11 +180,11 @@ func (a *App) shutdownModules(ctx context.Context) error {
 
 // Command handling has been removed since commands are processed through events
 
-// DispatchEvent hands an event to all modules
+// DispatchEvent hands an event to all modules.
 func (a *App) DispatchEvent(eventType string, event any, raw []byte) {
 	// Get all registered modules
 	modules := GetModules()
-	
+
 	for name, mod := range modules {
 		go func(n string, m Module) {
 			if err := m.HandleEvent(eventType, event, raw); err != nil {
@@ -194,25 +194,25 @@ func (a *App) DispatchEvent(eventType string, event any, raw []byte) {
 	}
 }
 
-// initializeGitHubClient sets up the GitHub API client with proper authentication
+// initializeGitHubClient sets up the GitHub API client with proper authentication.
 func (a *App) initializeGitHubClient(ctx context.Context) error {
 	// Check if GitHub App authentication is configured
 	appID := a.Secrets.GetGitHubAppID()
 	installID := a.Secrets.GetGitHubInstallationID()
 	privateKey := a.Secrets.GetGitHubPrivateKey()
-	
+
 	if appID > 0 && installID > 0 && len(privateKey) > 0 {
 		// Use GitHub App authentication
 		appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
 		if err != nil {
 			return fmt.Errorf("failed to create GitHub app token source: %w", err)
 		}
-		
+
 		installationTokenSource := githubauth.NewInstallationTokenSource(installID, appTokenSource)
-		
+
 		// Create an HTTP client that uses the installation token
 		httpClient := oauth2.NewClient(ctx, installationTokenSource)
-		
+
 		// Create a new GitHub client with the custom HTTP client
 		a.GitHubClient = github.NewClient(httpClient)
 		slog.Info("GitHub client initialized with GitHub App authentication",
@@ -223,6 +223,6 @@ func (a *App) initializeGitHubClient(ctx context.Context) error {
 		a.GitHubClient = github.NewClient(nil)
 		slog.Info("GitHub client initialized (no auth)")
 	}
-	
+
 	return nil
 }

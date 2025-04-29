@@ -28,9 +28,9 @@ const (
 
 // AppError represents an application-level error with context.
 type AppError struct {
-	Type    ErrorType // Category of error
-	Op      string    // Operation that failed
-	Err     error     // Original error
+	Type    ErrorType      // Category of error
+	Op      string         // Operation that failed
+	Err     error          // Original error
 	Details map[string]any // Additional context
 }
 
@@ -53,7 +53,7 @@ func LogAndWrapError(err error, errType ErrorType, op string, details map[string
 	if err == nil {
 		return nil
 	}
-	
+
 	// If it's already an AppError, just add details
 	var appErr *AppError
 	if errors.As(err, &appErr) {
@@ -63,17 +63,17 @@ func LogAndWrapError(err error, errType ErrorType, op string, details map[string
 				appErr.Details[k] = v
 			}
 		}
-		
+
 		// Log at appropriate level
 		logAppError(appErr)
 		return appErr
 	}
-	
+
 	// Create details map if nil
 	if details == nil {
 		details = make(map[string]any)
 	}
-	
+
 	// Create a new AppError
 	appErr = &AppError{
 		Type:    errType,
@@ -81,7 +81,7 @@ func LogAndWrapError(err error, errType ErrorType, op string, details map[string
 		Err:     err,
 		Details: details,
 	}
-	
+
 	// Log at appropriate level
 	logAppError(appErr)
 	return appErr
@@ -92,11 +92,11 @@ func logAppError(err *AppError) {
 	// Extract log attributes from details
 	attrs := make([]any, 0, len(err.Details)*2+4)
 	attrs = append(attrs, "error_type", err.Type, "operation", err.Op)
-	
+
 	for k, v := range err.Details {
 		attrs = append(attrs, k, v)
 	}
-	
+
 	// Determine appropriate log level based on error type
 	switch err.Type {
 	case ErrorTypeConfig, ErrorTypeDatabase, ErrorTypeServer:

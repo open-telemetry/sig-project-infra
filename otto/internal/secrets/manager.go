@@ -4,9 +4,11 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 )
 
 // Manager is an interface for accessing secrets.
@@ -36,8 +38,7 @@ func (e *EnvManager) GetWebhookSecret() string {
 func (e *EnvManager) GetGitHubAppID() int64 {
 	envVal := os.Getenv("OTTO_GITHUB_APP_ID")
 	if envVal != "" {
-		var id int64
-		_, err := fmt.Sscanf(envVal, "%d", &id)
+		id, err := strconv.ParseInt(envVal, 10, 64)
 		if err == nil && id > 0 {
 			return id
 		}
@@ -49,8 +50,7 @@ func (e *EnvManager) GetGitHubAppID() int64 {
 func (e *EnvManager) GetGitHubInstallationID() int64 {
 	envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID")
 	if envVal != "" {
-		var id int64
-		_, err := fmt.Sscanf(envVal, "%d", &id)
+		id, err := strconv.ParseInt(envVal, 10, 64)
 		if err == nil && id > 0 {
 			return id
 		}
@@ -65,21 +65,21 @@ func (e *EnvManager) GetGitHubPrivateKey() []byte {
 
 // FileManager implements the Manager interface using a local file.
 type FileManager struct {
-	WebhookSecret       string
-	GitHubAppID         int64
+	WebhookSecret        string
+	GitHubAppID          int64
 	GitHubInstallationID int64
 	GitHubPrivateKeyPath string
-	privateKey          []byte
+	privateKey           []byte
 }
 
 // NewFileManager creates a new FileManager with the given values.
 func NewFileManager(webhook string, appID, installID int64, keyPath string, keyData []byte) *FileManager {
 	return &FileManager{
-		WebhookSecret:       webhook,
-		GitHubAppID:         appID,
+		WebhookSecret:        webhook,
+		GitHubAppID:          appID,
 		GitHubInstallationID: installID,
 		GitHubPrivateKeyPath: keyPath,
-		privateKey:          keyData,
+		privateKey:           keyData,
 	}
 }
 
@@ -132,7 +132,7 @@ func ValidateFileManager(secrets *FileManager) error {
 
 	// Validate required fields
 	if secrets.WebhookSecret == "" {
-		return fmt.Errorf("webhook_secret must be set")
+		return errors.New("webhook_secret must be set")
 	}
 
 	// For GitHub App authentication, we need all three fields or none
@@ -140,9 +140,11 @@ func ValidateFileManager(secrets *FileManager) error {
 	hasInstallID := secrets.GitHubInstallationID > 0
 	hasKeyPath := secrets.GitHubPrivateKeyPath != ""
 
-	if (hasAppID || hasInstallID || hasKeyPath) && 
-	   !(hasAppID && hasInstallID && hasKeyPath) {
-		return fmt.Errorf("github_app_id, github_installation_id, and github_private_key_path must all be set for GitHub App authentication")
+	if (hasAppID || hasInstallID || hasKeyPath) &&
+		(!hasAppID || !hasInstallID || !hasKeyPath) {
+		return errors.New(
+			"github_app_id, github_installation_id, and github_private_key_path must all be set for GitHub App authentication",
+		)
 	}
 
 	return nil
@@ -215,16 +217,16 @@ func LoadFileConfig(path string) (*FileManager, error) {
 	// Function implementation will be moved from config.go
 	// This is a placeholder
 	slog.Info("Loading secrets from file", "path", path)
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // LoadFromEnv loads secret configuration from environment variables.
 func LoadFromEnv() (*EnvManager, error) {
 	// Check if required environment variables are set
 	if os.Getenv("OTTO_WEBHOOK_SECRET") == "" {
-		return nil, fmt.Errorf("OTTO_WEBHOOK_SECRET environment variable is required")
+		return nil, errors.New("OTTO_WEBHOOK_SECRET environment variable is required")
 	}
-	
+
 	slog.Info("Loading secrets from environment variables")
 	return &EnvManager{}, nil
 }
@@ -232,18 +234,20 @@ func LoadFromEnv() (*EnvManager, error) {
 // Validate checks if the manager has all required secrets.
 func Validate(m Manager) error {
 	if m.GetWebhookSecret() == "" {
-		return fmt.Errorf("webhook secret is required")
+		return errors.New("webhook secret is required")
 	}
-	
+
 	// For GitHub App authentication, we need all three fields or none
 	hasAppID := m.GetGitHubAppID() > 0
 	hasInstallID := m.GetGitHubInstallationID() > 0
 	hasKeyData := len(m.GetGitHubPrivateKey()) > 0
-	
-	if (hasAppID || hasInstallID || hasKeyData) && 
-	   !(hasAppID && hasInstallID && hasKeyData) {
-		return fmt.Errorf("github_app_id, github_installation_id, and github_private_key must all be set for GitHub App authentication")
+
+	if (hasAppID || hasInstallID || hasKeyData) &&
+		(!hasAppID || !hasInstallID || !hasKeyData) {
+		return errors.New(
+			"github_app_id, github_installation_id, and github_private_key must all be set for GitHub App authentication",
+		)
 	}
-	
+
 	return nil
 }

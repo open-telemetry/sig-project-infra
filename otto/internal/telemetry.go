@@ -37,11 +37,17 @@ func InitOttoMetrics() {
 	metricsOnce.Do(func() {
 		meter := OttoMeter()
 		var err error
-		serverRequests, err = meter.Int64Counter("otto.server.requests_total", metric.WithDescription("Total HTTP requests"))
+		serverRequests, err = meter.Int64Counter(
+			"otto.server.requests_total",
+			metric.WithDescription("Total HTTP requests"),
+		)
 		if err != nil {
 			panic(err)
 		}
-		serverWebhooks, err = meter.Int64Counter("otto.server.webhooks_total", metric.WithDescription("Webhooks received"))
+		serverWebhooks, err = meter.Int64Counter(
+			"otto.server.webhooks_total",
+			metric.WithDescription("Webhooks received"),
+		)
 		if err != nil {
 			panic(err)
 		}
@@ -49,11 +55,17 @@ func InitOttoMetrics() {
 		if err != nil {
 			panic(err)
 		}
-		serverLatencyHistogram, err = meter.Float64Histogram("otto.server.request_latency_ms", metric.WithDescription("Request latency (ms)"))
+		serverLatencyHistogram, err = meter.Float64Histogram(
+			"otto.server.request_latency_ms",
+			metric.WithDescription("Request latency (ms)"),
+		)
 		if err != nil {
 			panic(err)
 		}
-		moduleCommands, err = meter.Int64Counter("otto.module.commands_total", metric.WithDescription("Module command invocations"))
+		moduleCommands, err = meter.Int64Counter(
+			"otto.module.commands_total",
+			metric.WithDescription("Module command invocations"),
+		)
 		if err != nil {
 			panic(err)
 		}
@@ -61,42 +73,63 @@ func InitOttoMetrics() {
 		if err != nil {
 			panic(err)
 		}
-		moduleAckLatency, err = meter.Float64Histogram("otto.module.ack_latency_ms", metric.WithDescription("Latency from issue to ack (ms)"))
+		moduleAckLatency, err = meter.Float64Histogram(
+			"otto.module.ack_latency_ms",
+			metric.WithDescription("Latency from issue to ack (ms)"),
+		)
 		if err != nil {
 			panic(err)
 		}
 	})
 }
 
-// Server metrics helpers
+// Server metrics helpers.
 func IncServerRequest(ctx context.Context, handler string) {
 	serverRequests.Add(ctx, 1, metric.WithAttributes(attribute.String("handler", handler)))
 }
+
 func IncServerWebhook(ctx context.Context, eventType string) {
 	serverWebhooks.Add(ctx, 1, metric.WithAttributes(attribute.String("event_type", eventType)))
 }
+
 func IncServerError(ctx context.Context, handler string, errType string) {
-	serverErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("handler", handler), attribute.String("err_type", errType)))
+	serverErrors.Add(
+		ctx,
+		1,
+		metric.WithAttributes(attribute.String("handler", handler), attribute.String("err_type", errType)),
+	)
 }
+
 func RecordServerLatency(ctx context.Context, handler string, ms float64) {
 	serverLatencyHistogram.Record(ctx, ms, metric.WithAttributes(attribute.String("handler", handler)))
 }
 
-// Module metrics helpers
+// Module metrics helpers.
 func IncModuleCommand(ctx context.Context, module, command string) {
-	moduleCommands.Add(ctx, 1, metric.WithAttributes(attribute.String("module", module), attribute.String("command", command)))
+	moduleCommands.Add(
+		ctx,
+		1,
+		metric.WithAttributes(attribute.String("module", module), attribute.String("command", command)),
+	)
 }
+
 func IncModuleError(ctx context.Context, module, errType string) {
-	moduleErrors.Add(ctx, 1, metric.WithAttributes(attribute.String("module", module), attribute.String("err_type", errType)))
+	moduleErrors.Add(
+		ctx,
+		1,
+		metric.WithAttributes(attribute.String("module", module), attribute.String("err_type", errType)),
+	)
 }
+
 func RecordAckLatency(ctx context.Context, module string, ms float64) {
 	moduleAckLatency.Record(ctx, ms, metric.WithAttributes(attribute.String("module", module)))
 }
 
-// Tracing helpers
+// Tracing helpers.
 func StartServerEventSpan(ctx context.Context, eventType string) (context.Context, trace.Span) {
 	return OttoTracer().Start(ctx, "server.handle_"+eventType)
 }
+
 func StartModuleCommandSpan(ctx context.Context, module, command string) (context.Context, trace.Span) {
 	return OttoTracer().Start(ctx, "module."+module+"."+command)
 }

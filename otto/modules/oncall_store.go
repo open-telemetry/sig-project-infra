@@ -4,6 +4,7 @@ package modules
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -63,7 +64,12 @@ func AutoMigrateOnCall(db *sql.DB) error {
 
 func AddUser(db *sql.DB, gh, name string) (*OnCallUser, error) {
 	now := time.Now()
-	res, err := db.Exec(`INSERT INTO oncall_users (github, display_name, active, created_at) VALUES (?, ?, 1, ?)`, gh, name, now)
+	res, err := db.Exec(
+		`INSERT INTO oncall_users (github, display_name, active, created_at) VALUES (?, ?, 1, ?)`,
+		gh,
+		name,
+		now,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +79,7 @@ func AddUser(db *sql.DB, gh, name string) (*OnCallUser, error) {
 
 func AddSchedule(db *sql.DB, name, policyStr string) (*OnCallSchedule, error) {
 	now := time.Now()
-	
+
 	// Convert string to OnCallScheduleRotationPolicy
 	var policy OnCallScheduleRotationPolicy
 	switch policyStr {
@@ -87,19 +93,24 @@ func AddSchedule(db *sql.DB, name, policyStr string) (*OnCallSchedule, error) {
 		policy = RoundRobinPolicy // Default to round-robin if unrecognized
 	}
 
-	res, err := db.Exec(`INSERT INTO oncall_schedules (name, policy, enabled, current_rotation_idx, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?)`,
-		name, string(policy), now, now)
+	res, err := db.Exec(
+		`INSERT INTO oncall_schedules (name, policy, enabled, current_rotation_idx, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?)`,
+		name,
+		string(policy),
+		now,
+		now,
+	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
 	return &OnCallSchedule{
-		ID:                 id, 
-		Name:               name, 
-		Policy:             policy, 
-		Enabled:            true, 
+		ID:                 id,
+		Name:               name,
+		Policy:             policy,
+		Enabled:            true,
 		CurrentRotationIdx: 0,
-		CreatedAt:          now, 
+		CreatedAt:          now,
 		UpdatedAt:          now,
 	}, nil
 }
@@ -113,7 +124,10 @@ func AssignUserToSchedule(db *sql.DB, scheduleID, userID int64, position int) er
 }
 
 func GetScheduleByName(db *sql.DB, name string) (*OnCallSchedule, error) {
-	row := db.QueryRow(`SELECT id, name, policy, enabled, current_rotation_idx, created_at, updated_at FROM oncall_schedules WHERE name = ?`, name)
+	row := db.QueryRow(
+		`SELECT id, name, policy, enabled, current_rotation_idx, created_at, updated_at FROM oncall_schedules WHERE name = ?`,
+		name,
+	)
 	var s OnCallSchedule
 	err := row.Scan(&s.ID, &s.Name, &s.Policy, &s.Enabled, &s.CurrentRotationIdx, &s.CreatedAt, &s.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -141,8 +155,17 @@ func GetCurrentOnCallUser(db *sql.DB, scheduleName string) (*OnCallUser, error) 
 	case RoundRobinPolicy:
 		idx := schedule.CurrentRotationIdx % len(users)
 		currentUserSchedule := users[idx]
-		row := db.QueryRow(`SELECT id, github, display_name, active, created_at FROM oncall_users WHERE id = ?`, currentUserSchedule.UserID)
-		err = row.Scan(&currentUser.ID, &currentUser.GitHub, &currentUser.DisplayName, &currentUser.Active, &currentUser.CreatedAt)
+		row := db.QueryRow(
+			`SELECT id, github, display_name, active, created_at FROM oncall_users WHERE id = ?`,
+			currentUserSchedule.UserID,
+		)
+		err = row.Scan(
+			&currentUser.ID,
+			&currentUser.GitHub,
+			&currentUser.DisplayName,
+			&currentUser.Active,
+			&currentUser.CreatedAt,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -170,15 +193,17 @@ func AdvanceOnCallSchedule(db *sql.DB, scheduleName string) error {
 	newRotationIdx := (schedule.CurrentRotationIdx + 1) % len(users)
 
 	// Update the schedule's current rotation index
-	_, err = db.Exec(`UPDATE oncall_schedules SET current_rotation_idx = ?, updated_at = ? WHERE id = ?`, 
+	_, err = db.Exec(`UPDATE oncall_schedules SET current_rotation_idx = ?, updated_at = ? WHERE id = ?`,
 		newRotationIdx, time.Now(), schedule.ID)
-	
+
 	return err
 }
 
 func ListUsersForSchedule(db *sql.DB, scheduleID int64) ([]OnCallScheduleUser, error) {
 	rows, err := db.Query(
-		`SELECT schedule_id, user_id, position FROM oncall_schedules_users WHERE schedule_id = ? ORDER BY position ASC`, scheduleID)
+		`SELECT schedule_id, user_id, position FROM oncall_schedules_users WHERE schedule_id = ? ORDER BY position ASC`,
+		scheduleID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -194,11 +219,24 @@ func ListUsersForSchedule(db *sql.DB, scheduleID int64) ([]OnCallScheduleUser, e
 	return rels, nil
 }
 
-func AddTask(db *sql.DB, scheduleID int64, repo string, issueNum int, title, description string, assignedTo int64) (*OnCallTask, error) {
+func AddTask(
+	db *sql.DB,
+	scheduleID int64,
+	repo string,
+	issueNum int,
+	title, description string,
+	assignedTo int64,
+) (*OnCallTask, error) {
 	now := time.Now()
 	res, err := db.Exec(
 		`INSERT INTO oncall_tasks (schedule_id, repo, issue_num, title, description, status, assigned_to, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`,
-		scheduleID, repo, issueNum, title, description, assignedTo, now,
+		scheduleID,
+		repo,
+		issueNum,
+		title,
+		description,
+		assignedTo,
+		now,
 	)
 	if err != nil {
 		return nil, err
@@ -220,9 +258,24 @@ func AddTask(db *sql.DB, scheduleID int64, repo string, issueNum int, title, des
 func GetTaskByIssueNumber(db *sql.DB, repo string, issueNum int) (*OnCallTask, error) {
 	row := db.QueryRow(
 		`SELECT id, schedule_id, repo, issue_num, title, description, status, assigned_to, created_at, acked_at, completed_at
-		 FROM oncall_tasks WHERE repo = ? AND issue_num = ?`, repo, issueNum)
+		 FROM oncall_tasks WHERE repo = ? AND issue_num = ?`,
+		repo,
+		issueNum,
+	)
 	var t OnCallTask
-	err := row.Scan(&t.ID, &t.ScheduleID, &t.Repo, &t.IssueNum, &t.Title, &t.Description, &t.Status, &t.AssignedTo, &t.CreatedAt, &t.AckedAt, &t.CompletedAt)
+	err := row.Scan(
+		&t.ID,
+		&t.ScheduleID,
+		&t.Repo,
+		&t.IssueNum,
+		&t.Title,
+		&t.Description,
+		&t.Status,
+		&t.AssignedTo,
+		&t.CreatedAt,
+		&t.AckedAt,
+		&t.CompletedAt,
+	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -247,7 +300,7 @@ func UpdateTaskStatus(db *sql.DB, id int64, status string) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
 			slog.Error("Failed to rollback transaction", "error", err)
 		}
 	}() // Rollback in case of error, won't do anything if commit succeeds
@@ -295,7 +348,17 @@ func GetTask(db *sql.DB, id int64) (*OnCallTask, error) {
 	)
 	var t OnCallTask
 	err := row.Scan(
-		&t.ID, &t.ScheduleID, &t.Repo, &t.IssueNum, &t.Title, &t.Description, &t.Status, &t.AssignedTo, &t.CreatedAt, &t.AckedAt, &t.CompletedAt,
+		&t.ID,
+		&t.ScheduleID,
+		&t.Repo,
+		&t.IssueNum,
+		&t.Title,
+		&t.Description,
+		&t.Status,
+		&t.AssignedTo,
+		&t.CreatedAt,
+		&t.AckedAt,
+		&t.CompletedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil

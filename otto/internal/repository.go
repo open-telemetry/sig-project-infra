@@ -5,7 +5,6 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 )
 
@@ -39,11 +38,11 @@ func NewSQLiteRepository(db *sql.DB) Repository {
 	return &SQLiteRepository{db: db}
 }
 
-// Ping checks database connectivity
+// Ping checks database connectivity.
 func (r *SQLiteRepository) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
+
 	err := r.db.PingContext(ctx)
 	if err != nil {
 		return LogAndWrapError(err, ErrorTypeDatabase, "ping", nil)
@@ -51,7 +50,7 @@ func (r *SQLiteRepository) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the database connection
+// Close closes the database connection.
 func (r *SQLiteRepository) Close() error {
 	err := r.db.Close()
 	if err != nil {
@@ -60,11 +59,11 @@ func (r *SQLiteRepository) Close() error {
 	return nil
 }
 
-// Exec executes a query without returning rows
+// Exec executes a query without returning rows.
 func (r *SQLiteRepository) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	resp, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, LogAndWrapError(err, ErrorTypeDatabase, "exec", map[string]any{
@@ -74,11 +73,11 @@ func (r *SQLiteRepository) Exec(ctx context.Context, query string, args ...any) 
 	return resp, nil
 }
 
-// Query executes a query that returns rows
+// Query executes a query that returns rows.
 func (r *SQLiteRepository) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, LogAndWrapError(err, ErrorTypeDatabase, "query", map[string]any{
@@ -88,19 +87,19 @@ func (r *SQLiteRepository) Query(ctx context.Context, query string, args ...any)
 	return rows, nil
 }
 
-// QueryRow executes a query that returns a single row
+// QueryRow executes a query that returns a single row.
 func (r *SQLiteRepository) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	return r.db.QueryRowContext(ctx, query, args...)
 }
 
-// BeginTx starts a new transaction
+// BeginTx starts a new transaction.
 func (r *SQLiteRepository) BeginTx(ctx context.Context) (Transaction, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, LogAndWrapError(err, ErrorTypeDatabase, "begin_transaction", nil)
@@ -108,12 +107,12 @@ func (r *SQLiteRepository) BeginTx(ctx context.Context) (Transaction, error) {
 	return &SQLiteTransaction{tx: tx}, nil
 }
 
-// SQLiteTransaction implements Transaction for SQLite
+// SQLiteTransaction implements Transaction for SQLite.
 type SQLiteTransaction struct {
 	tx *sql.Tx
 }
 
-// Commit commits the transaction
+// Commit commits the transaction.
 func (t *SQLiteTransaction) Commit() error {
 	err := t.tx.Commit()
 	if err != nil {
@@ -122,7 +121,7 @@ func (t *SQLiteTransaction) Commit() error {
 	return nil
 }
 
-// Rollback rolls back the transaction
+// Rollback rolls back the transaction.
 func (t *SQLiteTransaction) Rollback() error {
 	err := t.tx.Rollback()
 	if err != nil {
@@ -131,11 +130,11 @@ func (t *SQLiteTransaction) Rollback() error {
 	return nil
 }
 
-// Exec executes a query within the transaction
+// Exec executes a query within the transaction.
 func (t *SQLiteTransaction) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	resp, err := t.tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return nil, LogAndWrapError(err, ErrorTypeDatabase, "tx_exec", map[string]any{
@@ -145,11 +144,11 @@ func (t *SQLiteTransaction) Exec(ctx context.Context, query string, args ...any)
 	return resp, nil
 }
 
-// Query executes a query that returns rows within the transaction
+// Query executes a query that returns rows within the transaction.
 func (t *SQLiteTransaction) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	rows, err := t.tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, LogAndWrapError(err, ErrorTypeDatabase, "tx_query", map[string]any{
@@ -159,19 +158,19 @@ func (t *SQLiteTransaction) Query(ctx context.Context, query string, args ...any
 	return rows, nil
 }
 
-// QueryRow executes a query that returns a single row within the transaction
+// QueryRow executes a query that returns a single row within the transaction.
 func (t *SQLiteTransaction) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	
+
 	return t.tx.QueryRowContext(ctx, query, args...)
 }
 
-// truncateQuery trims a query string for logging purposes
+// truncateQuery trims a query string for logging purposes.
 func truncateQuery(query string) string {
 	const maxLen = 100
 	if len(query) <= maxLen {
 		return query
 	}
-	return fmt.Sprintf("%s...(truncated)", query[:maxLen])
+	return query[:maxLen] + "...(truncated)"
 }

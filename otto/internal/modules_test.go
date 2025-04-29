@@ -10,9 +10,9 @@ import (
 )
 
 type mockModule struct {
-	name     string
-	handled  int32
-	eventWG  *sync.WaitGroup
+	name    string
+	handled int32
+	eventWG *sync.WaitGroup
 }
 
 func (m *mockModule) Name() string { return m.name }

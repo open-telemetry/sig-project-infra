@@ -15,7 +15,7 @@ import (
 	"github.com/open-telemetry/sig-project-infra/otto/internal"
 )
 
-// Import internal types for error handling
+// Import internal types for error handling.
 var (
 	LogAndWrapError  = internal.LogAndWrapError
 	ErrorTypeCommand = internal.ErrorTypeCommand
@@ -28,7 +28,7 @@ type OnCallModule struct {
 
 func (o *OnCallModule) Name() string { return "oncall" }
 
-// Initialize implements the ModuleInitializer interface
+// Initialize implements the ModuleInitializer interface.
 func (o *OnCallModule) Initialize(ctx context.Context, app *internal.App) error {
 	o.app = app
 	o.db = app.DB
@@ -148,7 +148,7 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 			"message", message)
 		return nil
 	}
-	
+
 	// Parse repo into owner and repo name
 	parts := strings.Split(repo, "/")
 	if len(parts) != 2 {
@@ -176,7 +176,7 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 	return nil
 }
 
-// Shutdown implements the ModuleShutdowner interface
+// Shutdown implements the ModuleShutdowner interface.
 func (o *OnCallModule) Shutdown(ctx context.Context) error {
 	// Nothing to clean up
 	return nil

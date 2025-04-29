@@ -3,6 +3,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,18 +13,18 @@ import (
 
 // FileConfig represents the secrets configuration in a YAML file.
 type FileConfig struct {
-	WebhookSecret       string `yaml:"webhook_secret"`
-	GitHubAppID         int64  `yaml:"github_app_id"`
+	WebhookSecret        string `yaml:"webhook_secret"`
+	GitHubAppID          int64  `yaml:"github_app_id"`
 	GitHubInstallationID int64  `yaml:"github_installation_id"`
 	GitHubPrivateKeyPath string `yaml:"github_private_key_path"`
 }
 
 // OnePasswordConfig represents the 1Password secrets configuration in a YAML file.
 type OnePasswordConfig struct {
-	WebhookSecretRef  string `yaml:"webhook_secret_ref"`
-	AppIDRef          string `yaml:"github_app_id_ref"`
-	InstallIDRef      string `yaml:"github_installation_id_ref"`
-	PrivateKeyRef     string `yaml:"github_private_key_ref"`
+	WebhookSecretRef string `yaml:"webhook_secret_ref"`
+	AppIDRef         string `yaml:"github_app_id_ref"`
+	InstallIDRef     string `yaml:"github_installation_id_ref"`
+	PrivateKeyRef    string `yaml:"github_private_key_ref"`
 }
 
 // GlobalSecrets is the global secrets manager.
@@ -51,7 +52,9 @@ func LoadSecrets(path string) (Manager, error) {
 
 			// Check if required environment variables are set
 			if os.Getenv("OTTO_WEBHOOK_SECRET") == "" {
-				return nil, fmt.Errorf("OTTO_WEBHOOK_SECRET environment variable is required when secrets file is not present")
+				return nil, errors.New(
+					"OTTO_WEBHOOK_SECRET environment variable is required when secrets file is not present",
+				)
 			}
 
 			// Create an environment manager

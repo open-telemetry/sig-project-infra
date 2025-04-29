@@ -9,7 +9,7 @@ import (
 
 func TestLoadFromFile(t *testing.T) {
 	// Create a temporary config file for testing
-	tempFile, err := os.CreateTemp("", "config-*.yaml")
+	tempFile, err := os.CreateTemp(t.TempDir(), "config-*.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}

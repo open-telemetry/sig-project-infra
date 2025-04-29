@@ -58,7 +58,7 @@ func RegisterModule(m Module) {
 	slog.Info("module registered", "name", m.Name())
 }
 
-// GetModules returns a copy of the registered modules map
+// GetModules returns a copy of the registered modules map.
 func GetModules() map[string]Module {
 	modulesMu.RLock()
 	defer modulesMu.RUnlock()

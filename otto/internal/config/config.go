@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AppConfig contains non-secret application configuration
+// AppConfig contains non-secret application configuration.
 type AppConfig struct {
 	Port    string         `yaml:"port"`
 	DBPath  string         `yaml:"db_path"`
@@ -18,7 +18,7 @@ type AppConfig struct {
 	Modules map[string]any `yaml:"modules"`
 }
 
-// Global stores the main application configuration
+// Global stores the main application configuration.
 var Global AppConfig
 
 // Load reads YAML config from path into Global.
@@ -33,7 +33,7 @@ func Load(path string) error {
 	return nil
 }
 
-// LoadFromFile reads YAML config from path into an AppConfig struct
+// LoadFromFile reads YAML config from path into an AppConfig struct.
 func LoadFromFile(path string) (*AppConfig, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -56,13 +56,13 @@ func LoadFromFile(path string) (*AppConfig, error) {
 	return config, nil
 }
 
-// Validate checks that all required config fields are present and valid
+// Validate checks that all required config fields are present and valid.
 func Validate(config *AppConfig) error {
 	// No required fields in non-secret config
 	return nil
 }
 
-// ApplyDefaults sets default values for optional config fields
+// ApplyDefaults sets default values for optional config fields.
 func ApplyDefaults(config *AppConfig) {
 	if config.Port == "" {
 		config.Port = "8080"
@@ -80,7 +80,7 @@ func ApplyDefaults(config *AppConfig) {
 	}
 }
 
-// LogSummary logs a sanitized summary of the loaded configuration
+// LogSummary logs a sanitized summary of the loaded configuration.
 func LogSummary(config *AppConfig) {
 	slog.Info("configuration loaded",
 		"port", config.Port,

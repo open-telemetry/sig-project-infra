@@ -25,15 +25,15 @@ type Server struct {
 	webhookSecret []byte // from secrets config
 	mux           *http.ServeMux
 	server        *http.Server
-	app           *App    // Reference to the app for dispatching events
+	app           *App // Reference to the app for dispatching events
 }
 
-// NewServer creates a new server with the provided webhook secret and address
+// NewServer creates a new server with the provided webhook secret and address.
 func NewServer(addr string, secretsManager secrets.Manager) *Server {
 	return NewServerWithApp(addr, secretsManager, nil)
 }
 
-// NewServerWithApp creates a server with a reference to the app
+// NewServerWithApp creates a server with a reference to the app.
 func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Server {
 	mux := http.NewServeMux()
 	srv := &Server{
@@ -43,7 +43,7 @@ func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Se
 			Addr:    fmt.Sprintf(":%v", addr),
 			Handler: mux,
 		},
-		app:           app,
+		app: app,
 	}
 	mux.HandleFunc("/webhook", srv.handleWebhook)
 	mux.HandleFunc("/healthz", handleHealthz)
@@ -96,19 +96,19 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	slog.Info("received event",
 		"type", eventType,
 		"struct", fmt.Sprintf("%T", event))
-	
+
 	// Dispatch event to all modules
 	if s.app != nil {
 		s.app.DispatchEvent(eventType, event, payload)
 	} else {
 		slog.Error("No app reference in server, event dispatch failed")
 	}
-	
+
 	RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
 	w.WriteHeader(http.StatusOK)
 }
 
-// verifySignature checks the request payload using the shared secret (GitHub webhook HMAC SHA256)
+// verifySignature checks the request payload using the shared secret (GitHub webhook HMAC SHA256).
 func (s *Server) verifySignature(payload []byte, sig string) bool {
 	if !strings.HasPrefix(sig, "sha256=") {
 		return false

@@ -9,7 +9,7 @@ The tools deployed into the cluster are:
 
 - Cert-Manager
 - OpenTelemetry Operator
-- Liatrio OTel Collector (for GitHub metrics w/ exponential backoffs and Gitub App Authentication)
+- Liatrio OTel Collector (for GitHub metrics w/ exponential backoffs and Gitub App Authentication, to be upstreamed to OTel Collector Contrib)
 - The OpenTelemetry Collector Contrib (for GitHub Action Tracing)
 - Signoz (for visualization of OTel data) (installed manually through Helm)
   - Clickhouse as a byproduct of the Signoz installation

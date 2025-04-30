@@ -2,3 +2,4 @@ otto/config.yaml
 otto/secrets.yaml
 otto/.env
 otto/dist
+.DS_Store

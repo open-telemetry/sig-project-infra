@@ -31,6 +31,11 @@ type App struct {
 }
 
 // NewApp creates and initializes a new application instance.
+//
+// Parameters:
+//   - ctx: The context for managing the application's lifecycle.
+//   - configPath: The file path to the application's configuration file.
+//   - secretsPath: The file path to the secrets file used for managing sensitive data.
 func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	// Load configuration
 	appConfig, err := config.Load(configPath)
@@ -217,7 +222,12 @@ func (a *App) initializeGitHubClient(ctx context.Context) error {
 	installID := a.Secrets.GetGitHubInstallationID()
 	privateKey := a.Secrets.GetGitHubPrivateKey()
 
-	if appID > 0 && installID > 0 && len(privateKey) > 0 {
+	if appID > 0 || installID > 0 || len(privateKey) > 0 {
+		// Check for partially provided credentials
+		if appID <= 0 || installID <= 0 || len(privateKey) == 0 {
+			return fmt.Errorf("incomplete GitHub App credentials provided: appID=%d, installID=%d, privateKeyLength=%d",
+				appID, installID, len(privateKey))
+		}
 		// Use GitHub App authentication
 		appTokenSource, err := githubauth.NewApplicationTokenSource(appID, privateKey)
 		if err != nil {

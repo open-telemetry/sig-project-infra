@@ -13,7 +13,7 @@ import (
 
 	"github.com/open-telemetry/sig-project-infra/otto/internal"
 	"github.com/open-telemetry/sig-project-infra/otto/internal/config"
-	_ "github.com/open-telemetry/sig-project-infra/otto/modules" // Import for side effects (module registration)
+	"github.com/open-telemetry/sig-project-infra/otto/modules" // Importing modules for explicit registration
 )
 
 func main() {
@@ -25,12 +25,7 @@ func main() {
 	configPath := config.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
 	secretsPath := config.GetEnvOrDefault("OTTO_SECRETS", "secrets.yaml")
 
-	// Load configuration into global config
-	err := config.Load(configPath)
-	if err != nil {
-		slog.Error("Failed to load config", "err", err)
-		os.Exit(1)
-	}
+	// App will load the configuration internally
 
 	// Create and initialize application
 	app, err := internal.NewApp(ctx, configPath, secretsPath)
@@ -38,6 +33,9 @@ func main() {
 		slog.Error("Failed to initialize application", "err", err)
 		os.Exit(1)
 	}
+
+	// Register modules explicitly
+	app.RegisterModule(&modules.OnCallModule{})
 
 	// Start the application
 	if err := app.Start(ctx); err != nil {

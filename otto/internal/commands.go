@@ -28,18 +28,29 @@ func IsSlashCommand(body string) bool {
 }
 
 // LogSlashCommand logs information about a detected slash command for tracing purposes.
-func LogSlashCommand(ctx context.Context, command string, args []string, issuer, repo string, issueNum int) {
+func LogSlashCommand(
+	ctx context.Context,
+	command string,
+	args []string,
+	issuer, repo string,
+	issueNum int,
+	telemetry *TelemetryManager,
+) {
 	// Create a span for command logging
-	// Capturing the updated context but not using it, as recommended by OpenTelemetry best practices
-	_, span := OttoTracer().Start(ctx, "otto.slash_command",
-		trace.WithAttributes(
-			attribute.String("repo", repo),
-			attribute.Int("issue_num", issueNum),
-			attribute.String("issuer", issuer),
-			attribute.String("command.name", command),
-			attribute.Int("command.args_count", len(args)),
-		))
-	defer span.End()
+	var span trace.Span
+
+	if telemetry != nil {
+		// If telemetry is provided, use it to create a span
+		_, span = telemetry.Tracer().Start(ctx, "otto.slash_command",
+			trace.WithAttributes(
+				attribute.String("repo", repo),
+				attribute.Int("issue_num", issueNum),
+				attribute.String("issuer", issuer),
+				attribute.String("command.name", command),
+				attribute.Int("command.args_count", len(args)),
+			))
+		defer span.End()
+	}
 
 	slog.Debug("Slash command detected",
 		"command", command,

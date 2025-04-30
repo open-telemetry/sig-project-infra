@@ -47,15 +47,61 @@ func NewServerWithApp(addr string, secretsManager secrets.Manager, app *App) *Se
 		app: app,
 	}
 	mux.HandleFunc("/webhook", srv.handleWebhook)
-	mux.HandleFunc("/healthz", handleHealthz)
+
+	// Health check endpoints
+	mux.HandleFunc("/check/liveness", srv.handleLivenessCheck)   // Kubernetes liveness probe
+	mux.HandleFunc("/check/readiness", srv.handleReadinessCheck) // Kubernetes readiness probe
+
 	return srv
 }
 
-func handleHealthz(w http.ResponseWriter, r *http.Request) {
+// handleLivenessCheck implements a Kubernetes liveness probe.
+// It returns healthy if the server is running and can accept requests.
+func (s *Server) handleLivenessCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte(`ok`))
+	_, err := w.Write([]byte(`{"status":"UP"}`))
 	if err != nil {
-		slog.Error("Failed to write response", "error", err)
+		slog.Error("Failed to write liveness response", "error", err)
+	}
+}
+
+// handleReadinessCheck implements a Kubernetes readiness probe.
+// It checks if the server is ready to accept traffic by verifying database connectivity.
+func (s *Server) handleReadinessCheck(w http.ResponseWriter, r *http.Request) {
+	// Check if app reference exists
+	if s.app == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, err := w.Write([]byte(`{"status":"DOWN","details":"App not initialized"}`))
+		if err != nil {
+			slog.Error("Failed to write readiness failure response", "error", err)
+		}
+		return
+	}
+
+	// Check database connectivity if database exists
+	if s.app.Database != nil {
+		err := s.app.Database.DB().Ping()
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, writeErr := w.Write(
+				[]byte(`{"status":"DOWN","details":"Database connection failed"}`),
+			)
+			if writeErr != nil {
+				slog.Error("Failed to write readiness failure response", "error", writeErr)
+			}
+			return
+		}
+	}
+
+	// All checks passed
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte(`{"status":"UP"}`))
+	if err != nil {
+		slog.Error("Failed to write readiness response", "error", err)
 	}
 }
 
@@ -63,15 +109,19 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	eventType := github.WebHookType(r)
-	ctx, span := StartServerEventSpan(r.Context(), eventType)
+	ctx, span := s.app.Telemetry.StartServerEventSpan(r.Context(), eventType)
 	defer span.End()
-	IncServerRequest(ctx, "webhook")
-	IncServerWebhook(ctx, eventType)
+	s.app.Telemetry.IncServerRequest(ctx, "webhook")
+	s.app.Telemetry.IncServerWebhook(ctx, eventType)
 
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
-		IncServerError(ctx, "webhook", "readBody")
-		RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
+		s.app.Telemetry.IncServerError(ctx, "webhook", "readBody")
+		s.app.Telemetry.RecordServerLatency(
+			ctx,
+			"webhook",
+			float64(time.Since(start).Milliseconds()),
+		)
 		http.Error(w, "could not read body", http.StatusBadRequest)
 		return
 	}
@@ -79,8 +129,12 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	sig := r.Header.Get("X-Hub-Signature-256")
 	if !s.verifySignature(payload, sig) {
-		IncServerError(ctx, "webhook", "badSig")
-		RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
+		s.app.Telemetry.IncServerError(ctx, "webhook", "badSig")
+		s.app.Telemetry.RecordServerLatency(
+			ctx,
+			"webhook",
+			float64(time.Since(start).Milliseconds()),
+		)
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}
@@ -88,8 +142,12 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	eventType = github.WebHookType(r)
 	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
-		IncServerError(ctx, "webhook", "parseEvent")
-		RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
+		s.app.Telemetry.IncServerError(ctx, "webhook", "parseEvent")
+		s.app.Telemetry.RecordServerLatency(
+			ctx,
+			"webhook",
+			float64(time.Since(start).Milliseconds()),
+		)
 		http.Error(w, "could not parse event", http.StatusBadRequest)
 		return
 	}
@@ -105,7 +163,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		slog.Error("No app reference in server, event dispatch failed")
 	}
 
-	RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
+	s.app.Telemetry.RecordServerLatency(ctx, "webhook", float64(time.Since(start).Milliseconds()))
 	w.WriteHeader(http.StatusOK)
 }
 

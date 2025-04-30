@@ -14,7 +14,7 @@ func TestEnvManager(t *testing.T) {
 	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "test-private-key")
 
 	// Create env manager
-	envManager := &EnvManager{}
+	envManager := NewEnvManager()
 
 	// Test webhook secret
 	if got := envManager.GetWebhookSecret(); got != "test-webhook-secret" {
@@ -156,14 +156,14 @@ func TestValidateFileManager(t *testing.T) {
 }
 
 func TestChain(t *testing.T) {
-	// Create managers
-	fileManager := NewFileManager(
-		"file-webhook-secret",
-		12345,
-		67890,
-		"file-key-path",
-		[]byte("file-private-key"),
-	)
+	// Create a fresh fileManager without env vars
+	fileManager := &FileManager{
+		WebhookSecret:        "file-webhook-secret",
+		GitHubAppID:          12345,
+		GitHubInstallationID: 67890,
+		GitHubPrivateKeyPath: "file-key-path",
+		privateKey:           []byte("file-private-key"),
+	}
 
 	// Set environment variables
 	t.Setenv("OTTO_WEBHOOK_SECRET", "env-webhook-secret")
@@ -171,7 +171,8 @@ func TestChain(t *testing.T) {
 	t.Setenv("OTTO_GITHUB_INSTALLATION_ID", "98765")
 	t.Setenv("OTTO_GITHUB_PRIVATE_KEY", "env-private-key")
 
-	envManager := &EnvManager{}
+	// Create envManager after setting env vars
+	envManager := NewEnvManager()
 
 	// Create chain with env first, file second
 	chain1 := NewChain(envManager, fileManager)
@@ -185,23 +186,23 @@ func TestChain(t *testing.T) {
 		t.Errorf("GetGitHubAppID() for chain1 = %v, want %v", got, 54321)
 	}
 
-	// Testing order is important - env vars take precedence over file in our current test
+	// Testing order is important - our chain checks in order
 	chain2 := NewChain(fileManager, envManager)
 
-	// Test chain2, but expect env vars to still be used since they exist
-	if got := chain2.GetWebhookSecret(); got != "env-webhook-secret" {
-		t.Errorf("GetWebhookSecret() for chain2 = %v, want %v", got, "env-webhook-secret")
+	// Test chain2, fileManager should be used first since it's first in the chain
+	if got := chain2.GetWebhookSecret(); got != "file-webhook-secret" {
+		t.Errorf("GetWebhookSecret() for chain2 = %v, want %v", got, "file-webhook-secret")
 	}
 
-	if got := chain2.GetGitHubAppID(); got != 54321 {
-		t.Errorf("GetGitHubAppID() for chain2 = %v, want %v", got, 54321)
+	if got := chain2.GetGitHubAppID(); got != 12345 {
+		t.Errorf("GetGitHubAppID() for chain2 = %v, want %v", got, 12345)
 	}
 
 	// Create chain with nil managers (should skip them)
 	chain3 := NewChain(nil, fileManager)
 
-	// But still expect env vars to be used via fileManager's implementation
-	if got := chain3.GetWebhookSecret(); got != "env-webhook-secret" {
-		t.Errorf("GetWebhookSecret() for chain3 = %v, want %v", got, "env-webhook-secret")
+	// Expect fileManager values since env vars are only checked at init now
+	if got := chain3.GetWebhookSecret(); got != "file-webhook-secret" {
+		t.Errorf("GetWebhookSecret() for chain3 = %v, want %v", got, "file-webhook-secret")
 	}
 }

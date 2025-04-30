@@ -60,7 +60,11 @@ func (r *SQLiteRepository) Close() error {
 }
 
 // Exec executes a query without returning rows.
-func (r *SQLiteRepository) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (r *SQLiteRepository) Exec(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (sql.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -74,7 +78,11 @@ func (r *SQLiteRepository) Exec(ctx context.Context, query string, args ...any) 
 }
 
 // Query executes a query that returns rows.
-func (r *SQLiteRepository) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (r *SQLiteRepository) Query(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*sql.Rows, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -131,7 +139,11 @@ func (t *SQLiteTransaction) Rollback() error {
 }
 
 // Exec executes a query within the transaction.
-func (t *SQLiteTransaction) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (t *SQLiteTransaction) Exec(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (sql.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -145,7 +157,11 @@ func (t *SQLiteTransaction) Exec(ctx context.Context, query string, args ...any)
 }
 
 // Query executes a query that returns rows within the transaction.
-func (t *SQLiteTransaction) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (t *SQLiteTransaction) Query(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*sql.Rows, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

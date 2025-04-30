@@ -129,7 +129,15 @@ func GetScheduleByName(db *sql.DB, name string) (*OnCallSchedule, error) {
 		name,
 	)
 	var s OnCallSchedule
-	err := row.Scan(&s.ID, &s.Name, &s.Policy, &s.Enabled, &s.CurrentRotationIdx, &s.CreatedAt, &s.UpdatedAt)
+	err := row.Scan(
+		&s.ID,
+		&s.Name,
+		&s.Policy,
+		&s.Enabled,
+		&s.CurrentRotationIdx,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -193,8 +201,12 @@ func AdvanceOnCallSchedule(db *sql.DB, scheduleName string) error {
 	newRotationIdx := (schedule.CurrentRotationIdx + 1) % len(users)
 
 	// Update the schedule's current rotation index
-	_, err = db.Exec(`UPDATE oncall_schedules SET current_rotation_idx = ?, updated_at = ? WHERE id = ?`,
-		newRotationIdx, time.Now(), schedule.ID)
+	_, err = db.Exec(
+		`UPDATE oncall_schedules SET current_rotation_idx = ?, updated_at = ? WHERE id = ?`,
+		newRotationIdx,
+		time.Now(),
+		schedule.ID,
+	)
 
 	return err
 }
@@ -330,7 +342,11 @@ func UpdateTaskStatus(db *sql.DB, id int64, status string) error {
 		return fmt.Errorf("failed to verify task status: %w", err)
 	}
 	if currentStatus != status {
-		return fmt.Errorf("failed to update task status: current status is %s, expected %s", currentStatus, status)
+		return fmt.Errorf(
+			"failed to update task status: current status is %s, expected %s",
+			currentStatus,
+			status,
+		)
 	}
 
 	// Commit the transaction

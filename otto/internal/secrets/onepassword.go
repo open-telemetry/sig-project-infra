@@ -5,7 +5,7 @@ package secrets
 import (
 	"context"
 	"errors"
-	"fmt"
+	"fmt" // needed for fmt.Errorf
 	"log/slog"
 	"os"
 	"strconv"
@@ -22,11 +22,23 @@ type OnePasswordManager struct {
 	privateKeyRef    string
 	refs             map[string]string
 	cachedValues     map[string]string
+
+	// Environment values take precedence and are cached during initialization
+	envWebhookSecret  string
+	envGitHubAppID    int64
+	envInstallationID int64
+	envPrivateKey     []byte
+	hasEnvWebhook     bool
+	hasEnvAppID       bool
+	hasEnvInstallID   bool
+	hasEnvPrivateKey  bool
 }
 
 // NewOnePasswordManager creates a new OnePasswordManager with the given references.
 // References should be in the format "op://vault-uuid/item-id-or-title/field".
-func NewOnePasswordManager(webhookRef, appIDRef, installIDRef, privateKeyRef string) (*OnePasswordManager, error) {
+func NewOnePasswordManager(
+	webhookRef, appIDRef, installIDRef, privateKeyRef string,
+) (*OnePasswordManager, error) {
 	// Get token from environment variables
 	token := os.Getenv("OTTO_1PASSWORD_TOKEN")
 	if token == "" {
@@ -53,6 +65,33 @@ func NewOnePasswordManager(webhookRef, appIDRef, installIDRef, privateKeyRef str
 		cachedValues:     make(map[string]string),
 	}
 
+	// Check for environment variables once during initialization
+	if envVal := os.Getenv("OTTO_WEBHOOK_SECRET"); envVal != "" {
+		manager.envWebhookSecret = envVal
+		manager.hasEnvWebhook = true
+	}
+
+	if envVal := os.Getenv("OTTO_GITHUB_APP_ID"); envVal != "" {
+		id, err := strconv.ParseInt(envVal, 10, 64)
+		if err == nil && id > 0 {
+			manager.envGitHubAppID = id
+			manager.hasEnvAppID = true
+		}
+	}
+
+	if envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID"); envVal != "" {
+		id, err := strconv.ParseInt(envVal, 10, 64)
+		if err == nil && id > 0 {
+			manager.envInstallationID = id
+			manager.hasEnvInstallID = true
+		}
+	}
+
+	if envVal := os.Getenv("OTTO_GITHUB_PRIVATE_KEY"); envVal != "" {
+		manager.envPrivateKey = []byte(envVal)
+		manager.hasEnvPrivateKey = true
+	}
+
 	// Validate references
 	if err := manager.validateReferences(); err != nil {
 		return nil, err
@@ -63,14 +102,20 @@ func NewOnePasswordManager(webhookRef, appIDRef, installIDRef, privateKeyRef str
 
 // validateReferences checks that the references are valid.
 func (o *OnePasswordManager) validateReferences() error {
+	// Skip validation if we have webhook secret from environment
+	if o.hasEnvWebhook {
+		return nil
+	}
+
 	if o.webhookSecretRef == "" {
 		return errors.New("webhook secret reference is required")
 	}
 
 	// Either all GitHub App references must be present, or none
-	hasAppID := o.appIDRef != ""
-	hasInstallID := o.installIDRef != ""
-	hasPrivateKey := o.privateKeyRef != ""
+	// (or should be available from env vars)
+	hasAppID := o.appIDRef != "" || o.hasEnvAppID
+	hasInstallID := o.installIDRef != "" || o.hasEnvInstallID
+	hasPrivateKey := o.privateKeyRef != "" || o.hasEnvPrivateKey
 
 	if (hasAppID || hasInstallID || hasPrivateKey) &&
 		(!hasAppID || !hasInstallID || !hasPrivateKey) {
@@ -103,9 +148,9 @@ func (o *OnePasswordManager) resolveReference(ctx context.Context, ref string) (
 
 // GetWebhookSecret returns the GitHub webhook secret.
 func (o *OnePasswordManager) GetWebhookSecret() string {
-	// Check environment variable first
-	if envVal := os.Getenv("OTTO_WEBHOOK_SECRET"); envVal != "" {
-		return envVal
+	// Check cached environment variable first
+	if o.hasEnvWebhook {
+		return o.envWebhookSecret
 	}
 
 	// Get the webhook secret from 1Password
@@ -123,13 +168,9 @@ func (o *OnePasswordManager) GetWebhookSecret() string {
 
 // GetGitHubAppID returns the GitHub App ID.
 func (o *OnePasswordManager) GetGitHubAppID() int64 {
-	// Check environment variable first
-	if envVal := os.Getenv("OTTO_GITHUB_APP_ID"); envVal != "" {
-		var id int64
-		_, err := fmt.Sscanf(envVal, "%d", &id)
-		if err == nil && id > 0 {
-			return id
-		}
+	// Check cached environment variable first
+	if o.hasEnvAppID {
+		return o.envGitHubAppID
 	}
 
 	// Get the app ID from 1Password
@@ -155,13 +196,9 @@ func (o *OnePasswordManager) GetGitHubAppID() int64 {
 
 // GetGitHubInstallationID returns the GitHub App Installation ID.
 func (o *OnePasswordManager) GetGitHubInstallationID() int64 {
-	// Check environment variable first
-	if envVal := os.Getenv("OTTO_GITHUB_INSTALLATION_ID"); envVal != "" {
-		var id int64
-		_, err := fmt.Sscanf(envVal, "%d", &id)
-		if err == nil && id > 0 {
-			return id
-		}
+	// Check cached environment variable first
+	if o.hasEnvInstallID {
+		return o.envInstallationID
 	}
 
 	// Get the installation ID from 1Password
@@ -187,9 +224,9 @@ func (o *OnePasswordManager) GetGitHubInstallationID() int64 {
 
 // GetGitHubPrivateKey returns the GitHub App private key.
 func (o *OnePasswordManager) GetGitHubPrivateKey() []byte {
-	// Check environment variable first
-	if envVal := os.Getenv("OTTO_GITHUB_PRIVATE_KEY"); envVal != "" {
-		return []byte(envVal)
+	// Check cached environment variable first
+	if o.hasEnvPrivateKey {
+		return o.envPrivateKey
 	}
 
 	// Get the private key from 1Password

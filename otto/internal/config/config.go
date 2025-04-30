@@ -19,19 +19,9 @@ type AppConfig struct {
 	Modules map[string]any `yaml:"modules"`
 }
 
-// Global stores the main application configuration.
-var Global AppConfig
-
-// Load reads YAML config from path into Global.
-func Load(path string) error {
-	config, err := LoadFromFile(path)
-	if err != nil {
-		return err
-	}
-
-	// Update global config
-	Global = *config
-	return nil
+// Load reads YAML config from path and returns an AppConfig.
+func Load(path string) (*AppConfig, error) {
+	return LoadFromFile(path)
 }
 
 // LoadFromFile reads YAML config from path into an AppConfig struct.

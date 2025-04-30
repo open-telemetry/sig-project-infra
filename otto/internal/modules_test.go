@@ -27,10 +27,14 @@ func (m *mockModule) HandleEvent(eventType string, event any, raw json.RawMessag
 func TestRegisterModuleAndDispatch(t *testing.T) {
 	var evWG sync.WaitGroup
 	mod := &mockModule{name: "testmod", eventWG: &evWG}
-	RegisterModule(mod)
 
-	// Create a test app
-	app := &App{}
+	// Create a test app with a module registry
+	app := &App{
+		ModuleRegistry: NewModuleRegistry(),
+	}
+
+	// Register the module with the app
+	app.RegisterModule(mod)
 
 	evWG.Add(1)
 

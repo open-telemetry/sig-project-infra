@@ -5,7 +5,6 @@ package internal
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -21,10 +20,12 @@ import (
 type App struct {
 	Config         *config.AppConfig
 	Secrets        secrets.Manager
-	DB             *sql.DB
+	Database       *Database
+	Telemetry      *TelemetryManager
 	Logger         *slog.Logger
 	Addr           string
 	GitHubClient   *github.Client // GitHub API client for interacting with GitHub
+	ModuleRegistry *ModuleRegistry
 	server         *Server
 	shutdownSignal chan struct{}
 }
@@ -32,7 +33,7 @@ type App struct {
 // NewApp creates and initializes a new application instance.
 func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	// Load configuration
-	appConfig, err := config.LoadFromFile(configPath)
+	appConfig, err := config.Load(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -43,11 +44,12 @@ func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 		return nil, err
 	}
 
-	// Initialize app with config
+	// Initialize app with config and empty module registry
 	app := &App{
 		Config:         appConfig,
 		Secrets:        secretsManager,
 		Addr:           appConfig.Port,
+		ModuleRegistry: NewModuleRegistry(),
 		shutdownSignal: make(chan struct{}),
 	}
 
@@ -57,15 +59,16 @@ func NewApp(ctx context.Context, configPath, secretsPath string) (*App, error) {
 	}
 
 	// Initialize telemetry
-	if err := InitTelemetry(ctx); err != nil {
-		return nil, err
+	app.Telemetry, err = NewTelemetryManager(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize telemetry: %w", err)
 	}
 
-	// Get logger after telemetry is initialized
-	app.Logger = RootSlogLogger()
+	// Get logger from telemetry
+	app.Logger = app.Telemetry.Logger
 
 	// Initialize database
-	app.DB, err = InitDB()
+	app.Database, err = NewDatabase(app.Config.DBPath)
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +110,15 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 
 	// Shutdown telemetry
-	if err := ShutdownTelemetry(ctx); err != nil {
-		a.Logger.Error("Error during telemetry shutdown", "err", err)
+	if a.Telemetry != nil {
+		if err := a.Telemetry.Shutdown(ctx); err != nil {
+			a.Logger.Error("Error during telemetry shutdown", "err", err)
+		}
 	}
 
 	// Close database
-	if a.DB != nil {
-		if err := a.DB.Close(); err != nil {
+	if a.Database != nil {
+		if err := a.Database.Close(); err != nil {
 			a.Logger.Error("Error closing database", "err", err)
 		}
 	}
@@ -131,10 +136,20 @@ func (a *App) SignalShutdown() {
 	close(a.shutdownSignal)
 }
 
+// RegisterModule registers a module with this app instance.
+func (a *App) RegisterModule(m Module) {
+	a.ModuleRegistry.RegisterModule(m)
+}
+
+// GetModules returns all registered modules for this app instance.
+func (a *App) GetModules() map[string]Module {
+	return a.ModuleRegistry.GetModules()
+}
+
 // initializeModules initializes all registered modules.
 func (a *App) initializeModules(ctx context.Context) error {
 	// Get all registered modules
-	modules := GetModules()
+	modules := a.ModuleRegistry.GetModules()
 
 	for name, mod := range modules {
 		if initializer, ok := mod.(ModuleInitializer); ok {
@@ -150,7 +165,7 @@ func (a *App) initializeModules(ctx context.Context) error {
 // shutdownModules gracefully shuts down all modules.
 func (a *App) shutdownModules(ctx context.Context) error {
 	// Get all registered modules
-	modules := GetModules()
+	modules := a.ModuleRegistry.GetModules()
 
 	var wg sync.WaitGroup
 	errors := make(chan error, len(modules))
@@ -184,7 +199,7 @@ func (a *App) shutdownModules(ctx context.Context) error {
 // DispatchEvent hands an event to all modules.
 func (a *App) DispatchEvent(eventType string, event any, raw []byte) {
 	// Get all registered modules
-	modules := GetModules()
+	modules := a.ModuleRegistry.GetModules()
 
 	for name, mod := range modules {
 		go func(n string, m Module) {

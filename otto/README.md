@@ -85,6 +85,32 @@ go build -o otto ./cmd/otto
 OTTO_CONFIG=custom-config.yaml OTTO_SECRETS=custom-secrets.yaml ./otto
 ```
 
+### Health Checks
+
+Otto provides the following HTTP endpoints for health monitoring:
+
+- `/check/liveness` - Kubernetes liveness probe (checks if the server can process requests)
+- `/check/readiness` - Kubernetes readiness probe (checks if all dependencies are ready, including database connectivity)
+
+Use these endpoints for monitoring and orchestration platforms:
+
+```bash
+# Kubernetes example:
+livenessProbe:
+  httpGet:
+    path: /check/liveness
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /check/readiness
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+```
+
 ### Docker
 
 You can run Otto using Docker with any of the supported configuration methods:

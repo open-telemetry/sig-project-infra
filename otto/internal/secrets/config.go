@@ -28,8 +28,7 @@ type OnePasswordConfig struct {
 	PrivateKeyRef    string `yaml:"github_private_key_ref"`
 }
 
-// GlobalSecrets is the global secrets manager.
-var GlobalSecrets Manager
+// Manager implementations provide access to sensitive configuration.
 
 // LoadSecrets loads secrets from the given path, environment variables, or 1Password.
 func LoadSecrets(path string) (Manager, error) {

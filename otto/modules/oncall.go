@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package modules contains implementations of the various Otto modules.
 package modules
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,29 +15,27 @@ import (
 	"github.com/open-telemetry/sig-project-infra/otto/internal"
 )
 
-// Import internal types for error handling
+// Import internal types for error handling.
 var (
 	LogAndWrapError  = internal.LogAndWrapError
 	ErrorTypeCommand = internal.ErrorTypeCommand
-
-	// lastCreatedTask is used for testing to track the most recently created task
-	lastCreatedTask *OnCallTask
 )
 
+// OnCallModule handles on-call rotation management.
 type OnCallModule struct {
-	app *internal.App
-	db  *sql.DB
+	app      *internal.App
+	database *internal.Database
 }
 
 func (o *OnCallModule) Name() string { return "oncall" }
 
-// Initialize implements the ModuleInitializer interface
+// Initialize implements the ModuleInitializer interface.
 func (o *OnCallModule) Initialize(ctx context.Context, app *internal.App) error {
 	o.app = app
-	o.db = app.DB
+	o.database = app.Database
 
 	// Initialize database tables
-	if err := AutoMigrateOnCall(app.DB); err != nil {
+	if err := AutoMigrateOnCall(o.database.DB()); err != nil {
 		return err
 	}
 
@@ -63,7 +61,7 @@ func (o *OnCallModule) Initialize(ctx context.Context, app *internal.App) error 
 
 func (o *OnCallModule) AcknowledgeTask(repo string, issueNum int, user string) error {
 	// Find the task
-	task, err := GetTaskByIssueNumber(o.db, repo, issueNum)
+	task, err := GetTaskByIssueNumber(o.database.DB(), repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("failed to find task: %w", err)
 	}
@@ -72,7 +70,7 @@ func (o *OnCallModule) AcknowledgeTask(repo string, issueNum int, user string) e
 	}
 
 	// Update task status
-	err = UpdateTaskStatus(o.db, task.ID, "ack")
+	err = UpdateTaskStatus(o.database.DB(), task.ID, "ack")
 	if err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
@@ -82,7 +80,7 @@ func (o *OnCallModule) AcknowledgeTask(repo string, issueNum int, user string) e
 
 func (o *OnCallModule) CheckUnacknowledgedTasks() error {
 	// Query for unacknowledged tasks older than 24 hours
-	rows, err := o.db.Query(`
+	rows, err := o.database.DB().Query(`
 		SELECT id, repo, issue_num, assigned_to, created_at
 		FROM oncall_tasks
 		WHERE status != 'ack'
@@ -122,7 +120,7 @@ func (o *OnCallModule) CheckUnacknowledgedTasks() error {
 
 func (o *OnCallModule) EscalateTask(taskID int64, repo string, issueNum int) error {
 	// Get the task details
-	task, err := GetTask(o.db, taskID)
+	task, err := GetTask(o.database.DB(), taskID)
 	if err != nil {
 		return fmt.Errorf("failed to get task details: %w", err)
 	}
@@ -151,7 +149,7 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 			"message", message)
 		return nil
 	}
-	
+
 	// Parse repo into owner and repo name
 	parts := strings.Split(repo, "/")
 	if len(parts) != 2 {
@@ -161,7 +159,7 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 
 	// Create the comment
 	comment := &github.IssueComment{
-		Body: github.String(message),
+		Body: github.Ptr(message),
 	}
 
 	// Create context
@@ -179,18 +177,23 @@ func (o *OnCallModule) PostGitHubComment(repo string, issueNum int, message stri
 	return nil
 }
 
-// Shutdown implements the ModuleShutdowner interface
+// Shutdown implements the ModuleShutdowner interface.
 func (o *OnCallModule) Shutdown(ctx context.Context) error {
 	// Nothing to clean up
 	return nil
 }
 
 func (o *OnCallModule) HandleEvent(eventType string, event any, raw json.RawMessage) error {
-	db := o.db
+	db := o.database.DB()
 	if db == nil {
-		return internal.LogAndWrapError(nil, internal.ErrorTypeCommand, "no_db_connection", map[string]any{
-			"module": "oncall",
-		})
+		return internal.LogAndWrapError(
+			nil,
+			internal.ErrorTypeCommand,
+			"no_db_connection",
+			map[string]any{
+				"module": "oncall",
+			},
+		)
 	}
 
 	switch eventType {
@@ -198,9 +201,14 @@ func (o *OnCallModule) HandleEvent(eventType string, event any, raw json.RawMess
 		// Cast to GitHub issues event
 		issuesEvent, ok := event.(*github.IssuesEvent)
 		if !ok {
-			return internal.LogAndWrapError(nil, internal.ErrorTypeCommand, "invalid_event_type", map[string]any{
-				"event_type": eventType,
-			})
+			return internal.LogAndWrapError(
+				nil,
+				internal.ErrorTypeCommand,
+				"invalid_event_type",
+				map[string]any{
+					"event_type": eventType,
+				},
+			)
 		}
 
 		// Check if the issue is closed
@@ -220,10 +228,15 @@ func (o *OnCallModule) HandleEvent(eventType string, event any, raw json.RawMess
 			// If task exists and is not already done, mark it as done
 			if task != nil && task.Status != "done" {
 				if err := UpdateTaskStatus(db, task.ID, "done"); err != nil {
-					return LogAndWrapError(err, ErrorTypeCommand, "update_task_status", map[string]any{
-						"task_id": task.ID,
-						"status":  "done",
-					})
+					return LogAndWrapError(
+						err,
+						ErrorTypeCommand,
+						"update_task_status",
+						map[string]any{
+							"task_id": task.ID,
+							"status":  "done",
+						},
+					)
 				}
 				slog.Info("Task marked as done due to issue closure",
 					"task_id", task.ID,
@@ -240,24 +253,39 @@ func (o *OnCallModule) HandleEvent(eventType string, event any, raw json.RawMess
 		}
 		task, err := GetTaskByIssueNumber(db, *commentEvent.Repo.Name, *commentEvent.Issue.Number)
 		if err != nil {
-			return LogAndWrapError(err, ErrorTypeCommand, "get_task_by_issue_number", map[string]any{
-				"repo":      *commentEvent.Repo.Name,
-				"issue_num": *commentEvent.Issue.Number,
-			})
+			return LogAndWrapError(
+				err,
+				ErrorTypeCommand,
+				"get_task_by_issue_number",
+				map[string]any{
+					"repo":      *commentEvent.Repo.Name,
+					"issue_num": *commentEvent.Issue.Number,
+				},
+			)
 		}
 		if strings.Contains(*commentEvent.GetComment().Body, "/ack") {
 			currentOnCall, err := GetCurrentOnCallUser(db, "primary")
 			if err != nil {
-				return LogAndWrapError(err, ErrorTypeCommand, "get_current_oncall_user", map[string]any{
-					"schedule_name": "primary",
-				})
+				return LogAndWrapError(
+					err,
+					ErrorTypeCommand,
+					"get_current_oncall_user",
+					map[string]any{
+						"schedule_name": "primary",
+					},
+				)
 			}
 			if currentOnCall.GitHub == *commentEvent.GetComment().User.Login {
 				if err := UpdateTaskStatus(db, task.ID, "ack"); err != nil {
-					return LogAndWrapError(err, ErrorTypeCommand, "update_task_status", map[string]any{
-						"task_id": task.ID,
-						"status":  "ack",
-					})
+					return LogAndWrapError(
+						err,
+						ErrorTypeCommand,
+						"update_task_status",
+						map[string]any{
+							"task_id": task.ID,
+							"status":  "ack",
+						},
+					)
 				}
 				slog.Info("Task marked as acknowledged.",
 					"task_id", task.ID,
@@ -268,8 +296,4 @@ func (o *OnCallModule) HandleEvent(eventType string, event any, raw json.RawMess
 		}
 	}
 	return nil
-}
-
-func init() {
-	internal.RegisterModule(&OnCallModule{})
 }

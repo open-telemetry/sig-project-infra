@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Package main is the entry point for the Otto application.
 package main
 
 import (
@@ -11,7 +12,8 @@ import (
 	"time"
 
 	"github.com/open-telemetry/sig-project-infra/otto/internal"
-	_ "github.com/open-telemetry/sig-project-infra/otto/modules" // Import for side effects (module registration)
+	"github.com/open-telemetry/sig-project-infra/otto/internal/config"
+	"github.com/open-telemetry/sig-project-infra/otto/modules" // Importing modules for explicit registration
 )
 
 func main() {
@@ -19,22 +21,21 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Load configuration path from environment
-	configPath := internal.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
+	// Load configuration paths from environment
+	configPath := config.GetEnvOrDefault("OTTO_CONFIG", "config.yaml")
+	secretsPath := config.GetEnvOrDefault("OTTO_SECRETS", "secrets.yaml")
 
-	// Load configuration into global config
-	err := internal.LoadConfig(configPath)
-	if err != nil {
-		slog.Error("Failed to load config", "err", err)
-		os.Exit(1)
-	}
+	// App will load the configuration internally
 
 	// Create and initialize application
-	app, err := internal.NewApp(ctx, configPath)
+	app, err := internal.NewApp(ctx, configPath, secretsPath)
 	if err != nil {
 		slog.Error("Failed to initialize application", "err", err)
 		os.Exit(1)
 	}
+
+	// Register modules explicitly
+	app.RegisterModule(&modules.OnCallModule{})
 
 	// Start the application
 	if err := app.Start(ctx); err != nil {

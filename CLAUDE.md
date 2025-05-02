@@ -26,6 +26,17 @@ cd otto && make build
 cd otto && make lint
 ```
 
+## Release Process
+
+This repository uses [release-please-action](https://github.com/googleapis/release-please-action) to automate versioning and release management based on [Conventional Commits](https://www.conventionalcommits.org/).
+
+- Commit messages must follow the Conventional Commits specification
+- Use `fix:` prefixes for bug fixes (patch version bump)
+- Use `feat:` prefixes for new features (minor version bump)
+- Use `feat!:` or `fix!:` for breaking changes (major version bump)
+- Releases are created automatically when release PRs are merged
+- Each project in the monorepo has its own versioning lifecycle
+
 ## General Guidelines
 
 - Create code and configs following the standards in each project's directory

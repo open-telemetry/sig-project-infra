@@ -1,0 +1,16 @@
+name: Otto Conventional Commits
+
+on:
+  pull_request_target:
+    paths:
+      - "otto/**"
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  semantic-pull-request:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

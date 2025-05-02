@@ -1,0 +1,7 @@
+tag.prefix: "v"          # Prefix for version tags
+pre.prefix: ""          # Prefix for pre-release versions
+build.prefix: "+"       # Prefix for build metadata
+metadata: false         # Include metadata in the version
+pre: false              # Pre-release mode
+no-metadata: true       # Exclude metadata from the version
+no-pre: true            # Exclude pre-release info from the version

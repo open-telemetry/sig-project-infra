@@ -1,0 +1,130 @@
+version: 2
+
+# Force project name to be "otto"
+project_name: otto
+
+# Signing configuration for binaries
+signs:
+  - cmd: cosign
+    args:
+      - "sign-blob"
+      - "--key=${env.COSIGN_KEY}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+    artifacts: checksum
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
+    signature: "${artifact}.sig"
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: otto
+    binary: otto
+    main: ./cmd/otto
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # Ignore combinations that don't exist
+    ignore:
+      - goos: darwin
+        goarch: "386"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/open-telemetry/sig-project-infra/otto/internal.Version={{.Version}}
+
+dockers:
+  - image_templates:
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-amd64"
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:latest-amd64"
+    dockerfile: Dockerfile.goreleaser
+    use: docker
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title=Otto"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/open-telemetry/sig-project-infra"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+    ids:
+      - otto
+
+  - image_templates:
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-arm64"
+      - "ghcr.io/open-telemetry/sig-project-infra/otto:latest-arm64"
+    dockerfile: Dockerfile.goreleaser
+    use: docker
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title=Otto"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/open-telemetry/sig-project-infra"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+    goarch: arm64
+    ids:
+      - otto
+
+# Add docker manifests as suggested by adrielp
+docker_manifests:
+  - name_template: ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}
+    image_templates:
+      - ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-amd64
+      - ghcr.io/open-telemetry/sig-project-infra/otto:{{ .Version }}-arm64
+  - name_template: ghcr.io/open-telemetry/sig-project-infra/otto:latest
+    image_templates:
+      - ghcr.io/open-telemetry/sig-project-infra/otto:latest-amd64
+      - ghcr.io/open-telemetry/sig-project-infra/otto:latest-arm64
+
+# Docker image signing configuration
+docker_signs:
+  - cmd: cosign
+    args:
+      - "sign"
+      - "--key=${env.COSIGN_KEY}"
+      - "${artifact}"
+    artifacts: images
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
+
+archives:
+  - id: default
+    name_template: >-
+      otto_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - config.example.yaml
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"

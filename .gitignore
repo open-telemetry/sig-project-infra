@@ -1,4 +1,5 @@
 otto/config.yaml
 otto/secrets.yaml
 otto/.env
-otto/*.pem
+otto/dist
+.DS_Store

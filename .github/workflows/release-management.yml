@@ -1,0 +1,52 @@
+name: Release Management
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          release-type: go
+          monorepo-tags: true
+          
+      # Save output variables as artifacts to be used by the GoReleaser workflow
+      - name: Save release outputs
+        if: ${{ steps.release.outputs.releases_created }}
+        run: |
+          # Save all the release-please outputs to files
+          echo "${{ steps.release.outputs.releases_created }}" > releases_created
+          echo "${{ steps.release.outputs.paths_released }}" > paths_released
+          
+          # Save Otto-specific outputs
+          echo "${{ steps.release.outputs['otto--release_created'] }}" > otto--release_created
+          echo "${{ steps.release.outputs['otto--tag_name'] }}" > otto--tag_name
+          
+      - name: Upload release outputs
+        if: ${{ steps.release.outputs.releases_created }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-please-outputs
+          path: |
+            releases_created
+            paths_released
+            otto--*
+            
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      otto_release_created: ${{ steps.release.outputs['otto--release_created'] }}
+      otto_tag_name: ${{ steps.release.outputs['otto--tag_name'] }}

@@ -1,0 +1,119 @@
+name: Otto GoReleaser
+
+on:
+  workflow_run:
+    workflows: ["Release Management"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release-otto:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Check if we need to run the release for Otto
+      - name: Download workflow artifact
+        uses: actions/github-script@v7
+        id: download-artifact
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+            
+            const matchArtifact = artifacts.data.artifacts.find(artifact => {
+              return artifact.name === "release-please-outputs"
+            });
+            
+            if (!matchArtifact) {
+              console.log('No release-please-outputs artifact found');
+              return false;
+            }
+            
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip'
+            });
+            
+            const fs = require('fs');
+            fs.writeFileSync('release-please-outputs.zip', Buffer.from(download.data));
+            
+            console.log('Downloaded artifact');
+            return true;
+      
+      - name: Unzip artifact
+        if: steps.download-artifact.outputs.result == 'true'
+        run: unzip release-please-outputs.zip
+      
+      - name: Read release information
+        id: release-info
+        if: steps.download-artifact.outputs.result == 'true'
+        run: |
+          if [ -f "otto--release_created" ]; then
+            RELEASE_CREATED=$(cat otto--release_created)
+            echo "otto_release_created=${RELEASE_CREATED}" >> $GITHUB_OUTPUT
+            if [ "${RELEASE_CREATED}" == "true" ] && [ -f "otto--tag_name" ]; then
+              TAG_NAME=$(cat otto--tag_name)
+              echo "otto_tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      # Only run the rest of the job if Otto was released
+      - name: Set up Go
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./otto/go.mod
+          cache: true
+
+      - name: Set up QEMU
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Install cosign for artifact signing
+      - name: Install cosign
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: sigstore/cosign-installer@v3.4.0
+        with:
+          cosign-release: 'v2.2.2'
+
+      - name: Run GoReleaser
+        if: steps.release-info.outputs.otto_release_created == 'true'
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+          workdir: ./otto
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # These secrets need to be set in the repository settings
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}

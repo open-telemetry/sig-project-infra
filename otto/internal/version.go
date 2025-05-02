@@ -3,6 +3,7 @@
 package internal
 
 // Version is set during build time via GoReleaser.
+// Source version is managed by release-please-action.
 var Version = "dev"
 
 // GetVersion returns the current Otto version.

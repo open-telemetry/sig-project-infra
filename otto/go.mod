@@ -6,7 +6,7 @@ require (
 	github.com/1password/onepassword-sdk-go v0.3.0
 	github.com/google/go-github/v71 v71.0.0
 	github.com/jferrl/go-githubauth v1.2.0
-	github.com/mattn/go-sqlite3 v1.14.22
+	github.com/mattn/go-sqlite3 v1.14.28
 	go.opentelemetry.io/contrib/bridges/otelslog v0.10.0
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.11.0

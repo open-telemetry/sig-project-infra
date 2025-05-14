@@ -1,0 +1,114 @@
+---
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: gh-tracing
+  namespace: otel-collectors
+spec:
+  image: otel/opentelemetry-collector-contrib:0.122.0
+  # image: otel/opentelemetry-collector-contrib:sha256-a1836513d23899a33954c299d0ef38bb0b01c63160afbd888da513ee3d90e98c.sig
+  # image: ghcr.io/liatrio/liatrio-otel-collector:0.85.1-amd64
+  mode: deployment
+  env:
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+  envFrom:
+    - secretRef:
+        name: honeycomb-ingest
+        optional: false
+  ports:
+    - port: 8088
+      name: webhook-port
+      protocol: TCP
+      targetPort: 8088
+
+  config:
+    connectors:
+      spanmetrics:
+
+    extensions:
+      health_check:
+        endpoint: "${env:POD_IP}:13133"
+
+    receivers:
+      github:
+        initial_delay: 1s
+        collection_interval: 1000s
+        scrapers:
+          scraper:
+            github_org: liatrio
+        webhook:
+          endpoint: "${env:POD_IP}:8088"
+          path: /events
+          health_path: /health
+
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "${env:POD_IP}:4317"
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+
+      batch:
+        send_batch_size: 100
+        timeout: 10s
+
+    exporters:
+      debug:
+        verbosity: basic
+        sampling_initial: 2
+        sampling_thereafter: 500
+
+      otlp/signoz:
+        endpoint: signoz-otel-collector.signoz:4317
+        tls:
+          insecure: true
+
+      otlp/honeycomb:
+        endpoint: api.honeycomb.io:443
+        headers:
+          x-honeycomb-team: ${env:HONEYCOMB_INGEST_KEY}
+
+    service:
+      # telemetry:
+      #   resource:
+      #     service.name: otel-collector
+      #     service.namespace: gh-traces
+      #   metrics:
+      #     readers:
+      #       - periodic:
+      #           exporter:
+      #             otlp:
+      #               endpoint: "${env:POD_IP}:4317"
+      #               protocol: grpc
+      extensions:
+        - health_check
+      pipelines:
+        traces:
+          receivers:
+            - github
+          processors:
+            - memory_limiter
+            - batch
+          exporters:
+            - debug
+            # - otlp
+            - otlp/signoz
+            - otlp/honeycomb
+
+        metrics:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - batch
+          exporters:
+            - debug
+            - otlp/signoz
+            - otlp/honeycomb

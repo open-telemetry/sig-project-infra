@@ -1,4 +1,7 @@
+# Otto
+otto/*.pem
 otto/config.yaml
+otto/secrets.yaml
 otto/.env
 
 # MacOS
@@ -13,4 +16,3 @@ inventory.yml
 playbook/debug.yml
 .vault_pass
 .vault*
-

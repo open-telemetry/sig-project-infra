@@ -14,7 +14,7 @@ func TestIsSlashCommand(t *testing.T) {
 		{"/echo foo bar", true},
 		{"not a command", false},
 		{"//not a command", false},
-		{"/   ", true},  // Still starts with a slash
+		{"/   ", true}, // Still starts with a slash
 		{"/echo", true},
 		{"prefix text\n/echo hey\nmore", true},
 	}

@@ -153,6 +153,49 @@ This requires:
 2. A 1Password Connect API token
 3. Items in your 1Password vault for each secret (webhook secret, GitHub App credentials)
 
+## Development
+
+Otto provides several commands to help with development, testing, and building the application.
+
+### Common Commands
+
+```bash
+# Build Otto
+make build
+
+# Run tests
+make test
+
+# Run linting
+make lint
+
+# Run database migrations up
+make migrate-up
+
+# Run database migrations down
+make migrate-down
+```
+
+### Test Coverage
+
+Otto provides several Makefile targets to check and report on test coverage:
+
+```bash
+# Generate coverage report to console
+make test-coverage
+
+# Generate HTML coverage report
+make test-coverage-html
+
+# Generate coverage badge SVG
+make test-coverage-badge
+
+# Check if coverage meets threshold (70%)
+make test-coverage-check
+```
+
+The coverage reports will be created in the `./coverage` directory.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Otto.

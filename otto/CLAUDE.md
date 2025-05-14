@@ -3,12 +3,30 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build Commands
-- Build: `go build -o otto ./cmd/otto`
-- Run: `./otto`
-- Test all: `go test ./...`
+- Build: `make build` or `go build -o otto ./cmd/otto`
+- Run: `make run` or `./otto`
+- Test all: `make test` or `go test ./...`
 - Test single file: `go test ./path/to/package -run TestName`
-- Lint: `golangci-lint run`
-- Docker build: `docker build -t otel-otto:latest .`
+- Generate test coverage: `make test-coverage`
+- Generate HTML coverage report: `make test-coverage-html`
+- Check coverage threshold: `make test-coverage-check`
+- Lint: `make lint` or `golangci-lint run`
+- Auto-fix linting issues: `make lint-fix`
+- Format code: `make fmt` (basic) or `make fmt-all` (comprehensive)
+- Fix imports ordering: `make fix-imports`
+- Fix line length: `make fix-lines`
+- Fix comments: `make fix-comments`
+- Run all linting and formatting: `make lint-all`
+- Install required tools: `make install-tools`
+- Docker build: `make docker-build` or `docker build -t otel-otto:latest .`
+- Database migrations: `make migrate-up` or `make migrate-down`
+
+## Architecture
+- The codebase follows a clean architecture pattern with dependency injection
+- Database operations use the Repository pattern with Go generics for type safety
+- All major components define interfaces for testability and use constructor-based dependency injection
+- Database migrations are handled via the golang-migrate library
+- The code is organized into focused packages with clean separation of concerns
 
 ## Code Style Guidelines
 - License: Include SPDX license header (`// SPDX-License-Identifier: Apache-2.0`) in all Go files

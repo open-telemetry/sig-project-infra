@@ -93,9 +93,6 @@ func TestRepository(t *testing.T) Repository {
 	return NewSQLiteRepository(db)
 }
 
-// Note: MockCommandHandler has been removed since commands are now
-// processed directly by modules in their HandleEvent implementation.
-
 // MockEventHandler is a function that can be used to mock an event handler.
 type MockEventHandler struct {
 	HandleEventFunc func(eventType string, event any, raw []byte) error
@@ -196,6 +193,3 @@ func (a *App) SimulateWebhookEvent(eventType string, options map[string]interfac
 	a.DispatchEvent(eventType, payload, payload)
 	return nil
 }
-
-// Note: Command simulation has been removed since commands are now
-// processed directly by modules in their HandleEvent implementation.

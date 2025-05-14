@@ -157,6 +157,11 @@ linters:
           - revive
         path: example.*_test\.go
         text: calls to (.+) only in main[(][)] or init[(][)] functions
+      # Ignore repetitive type names in oncall module as extensive refactoring would be needed
+      - linters:
+          - revive
+        path: modules/oncall/.*\.go
+        text: type name will be used as oncall.OnCall.* by other packages, and that is repetitive
       # It's okay to not run gosec and perfsprint in a test.
       - linters:
           - gosec

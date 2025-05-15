@@ -340,7 +340,7 @@ func (r *MockOnCallRepository) FindEscalationsByStatus(
 
 	var escalations []OnCallEscalation
 	for _, escalation := range r.escalations {
-		if escalation.Status == string(status) {
+		if escalation.Status == status {
 			escalations = append(escalations, *escalation)
 		}
 	}
@@ -440,18 +440,17 @@ func (r *MockOnCallRepository) DeleteEscalation(ctx context.Context, id string) 
 	return nil
 }
 
-// Transaction executes a function within an in-memory transaction.
+// Transaction executes a function within a database transaction.
 func (r *MockOnCallRepository) Transaction(ctx context.Context, fn func(tx OnCallTransaction) error) error {
-	tx := &MockOnCallTransaction{
-		repo: r,
-	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	return fn(tx)
+	txRepo := &MockOnCallTransaction{repo: r}
+	return fn(txRepo)
 }
 
 // EnsureSchema ensures the database schema is up to date.
 func (r *MockOnCallRepository) EnsureSchema(ctx context.Context) error {
-	// No-op for mock repository
 	return nil
 }
 
@@ -465,60 +464,155 @@ var _ OnCallTransaction = (*MockOnCallTransaction)(nil)
 
 // CreateUser inserts a new user within a transaction.
 func (t *MockOnCallTransaction) CreateUser(ctx context.Context, user *OnCallUser) error {
-	return t.repo.CreateUser(ctx, user)
+	if user.ID == "" {
+		user.ID = uuid.New().String()
+	}
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = time.Now()
+	}
+	if user.UpdatedAt.IsZero() {
+		user.UpdatedAt = time.Now()
+	}
+
+	t.repo.users[user.ID] = user
+	return nil
 }
 
 // UpdateUser updates an existing user within a transaction.
 func (t *MockOnCallTransaction) UpdateUser(ctx context.Context, user *OnCallUser) error {
-	return t.repo.UpdateUser(ctx, user)
+	if _, ok := t.repo.users[user.ID]; !ok {
+		return nil
+	}
+
+	user.UpdatedAt = time.Now()
+	t.repo.users[user.ID] = user
+	return nil
 }
 
 // DeleteUser removes a user by their ID within a transaction.
 func (t *MockOnCallTransaction) DeleteUser(ctx context.Context, id string) error {
-	return t.repo.DeleteUser(ctx, id)
+	delete(t.repo.users, id)
+	return nil
 }
 
 // CreateRotation inserts a new rotation within a transaction.
 func (t *MockOnCallTransaction) CreateRotation(ctx context.Context, rotation *OnCallRotation) error {
-	return t.repo.CreateRotation(ctx, rotation)
+	if rotation.ID == "" {
+		rotation.ID = uuid.New().String()
+	}
+	if rotation.CreatedAt.IsZero() {
+		rotation.CreatedAt = time.Now()
+	}
+	if rotation.UpdatedAt.IsZero() {
+		rotation.UpdatedAt = time.Now()
+	}
+
+	t.repo.rotations[rotation.ID] = rotation
+	return nil
 }
 
 // UpdateRotation updates an existing rotation within a transaction.
 func (t *MockOnCallTransaction) UpdateRotation(ctx context.Context, rotation *OnCallRotation) error {
-	return t.repo.UpdateRotation(ctx, rotation)
+	if _, ok := t.repo.rotations[rotation.ID]; !ok {
+		return nil
+	}
+
+	rotation.UpdatedAt = time.Now()
+	t.repo.rotations[rotation.ID] = rotation
+	return nil
 }
 
 // DeleteRotation removes a rotation by its ID within a transaction.
 func (t *MockOnCallTransaction) DeleteRotation(ctx context.Context, id string) error {
-	return t.repo.DeleteRotation(ctx, id)
+	delete(t.repo.rotations, id)
+	return nil
 }
 
 // CreateAssignment inserts a new assignment within a transaction.
 func (t *MockOnCallTransaction) CreateAssignment(ctx context.Context, assignment *OnCallAssignment) error {
-	return t.repo.CreateAssignment(ctx, assignment)
+	if assignment.ID == "" {
+		assignment.ID = uuid.New().String()
+	}
+	if assignment.CreatedAt.IsZero() {
+		assignment.CreatedAt = time.Now()
+	}
+	if assignment.UpdatedAt.IsZero() {
+		assignment.UpdatedAt = time.Now()
+	}
+
+	// If this is the current assignment, ensure no other assignments are marked as current
+	if assignment.IsCurrent {
+		for id, a := range t.repo.assignments {
+			if a.RotationID == assignment.RotationID && a.ID != assignment.ID {
+				a.IsCurrent = false
+				a.UpdatedAt = time.Now()
+				t.repo.assignments[id] = a
+			}
+		}
+	}
+
+	t.repo.assignments[assignment.ID] = assignment
+	return nil
 }
 
 // UpdateAssignment updates an existing assignment within a transaction.
 func (t *MockOnCallTransaction) UpdateAssignment(ctx context.Context, assignment *OnCallAssignment) error {
-	return t.repo.UpdateAssignment(ctx, assignment)
+	if _, ok := t.repo.assignments[assignment.ID]; !ok {
+		return nil
+	}
+
+	assignment.UpdatedAt = time.Now()
+
+	// If this is being marked as current, ensure no other assignments are current
+	if assignment.IsCurrent {
+		for id, a := range t.repo.assignments {
+			if a.RotationID == assignment.RotationID && a.ID != assignment.ID {
+				a.IsCurrent = false
+				a.UpdatedAt = time.Now()
+				t.repo.assignments[id] = a
+			}
+		}
+	}
+
+	t.repo.assignments[assignment.ID] = assignment
+	return nil
 }
 
 // DeleteAssignment removes an assignment by its ID within a transaction.
 func (t *MockOnCallTransaction) DeleteAssignment(ctx context.Context, id string) error {
-	return t.repo.DeleteAssignment(ctx, id)
+	delete(t.repo.assignments, id)
+	return nil
 }
 
 // CreateEscalation inserts a new escalation within a transaction.
 func (t *MockOnCallTransaction) CreateEscalation(ctx context.Context, escalation *OnCallEscalation) error {
-	return t.repo.CreateEscalation(ctx, escalation)
+	if escalation.ID == "" {
+		escalation.ID = uuid.New().String()
+	}
+	if escalation.CreatedAt.IsZero() {
+		escalation.CreatedAt = time.Now()
+	}
+	if escalation.UpdatedAt.IsZero() {
+		escalation.UpdatedAt = time.Now()
+	}
+
+	t.repo.escalations[escalation.ID] = escalation
+	return nil
 }
 
 // UpdateEscalation updates an existing escalation within a transaction.
 func (t *MockOnCallTransaction) UpdateEscalation(ctx context.Context, escalation *OnCallEscalation) error {
-	return t.repo.UpdateEscalation(ctx, escalation)
+	if _, ok := t.repo.escalations[escalation.ID]; !ok {
+		return nil
+	}
+
+	escalation.UpdatedAt = time.Now()
+	t.repo.escalations[escalation.ID] = escalation
+	return nil
 }
 
 // DeleteEscalation removes an escalation by its ID within a transaction.
 func (t *MockOnCallTransaction) DeleteEscalation(ctx context.Context, id string) error {
-	return t.repo.DeleteEscalation(ctx, id)
+	delete(t.repo.escalations, id)
+	return nil
 }

@@ -81,7 +81,7 @@ func TestOnCallModule(t *testing.T) {
 		escalation, err := repo.FindEscalationByIssue(ctx, "org/repo", 123)
 		require.NoError(t, err)
 		assert.NotNil(t, escalation)
-		assert.Equal(t, string(oncall.StatusAcknowledged), escalation.Status)
+		assert.Equal(t, oncall.StatusAcknowledged, escalation.Status)
 
 		// Check that a comment was posted
 		key := "org/repo/123"

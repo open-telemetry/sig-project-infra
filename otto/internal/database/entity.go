@@ -5,7 +5,7 @@ package database
 // BaseEntity provides a basic implementation of the Entity interface.
 // It can be embedded in other structs to fulfill the Entity interface.
 type BaseEntity struct {
-	ID string
+	ID string `db:"id"`
 }
 
 // GetID returns the entity's ID.

@@ -103,7 +103,7 @@ func createTestEscalation(
 		AssignmentID:   assignmentID,
 		IssueNumber:    123,
 		Repository:     "org/repo",
-		Status:         string(oncall.StatusPending),
+		Status:         oncall.StatusPending,
 		EscalationTime: time.Now(),
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),

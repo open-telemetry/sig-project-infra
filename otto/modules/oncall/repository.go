@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/open-telemetry/sig-project-infra/otto/internal/database"
 )
 
@@ -80,15 +81,9 @@ type OnCallTransaction interface {
 	DeleteEscalation(ctx context.Context, id string) error
 }
 
-// SQLiteOnCallRepository implements OnCallRepository for SQLite databases.
+// SQLiteOnCallRepository implements OnCallRepository for SQLite databases using sqlx.
 type SQLiteOnCallRepository struct {
 	db database.Provider
-
-	// Generic repositories for each entity type
-	userRepo       database.Repository[OnCallUser]
-	rotationRepo   database.Repository[OnCallRotation]
-	assignmentRepo database.Repository[OnCallAssignment]
-	escalationRepo database.Repository[OnCallEscalation]
 }
 
 // Ensure SQLiteOnCallRepository implements OnCallRepository.
@@ -104,16 +99,16 @@ func validateTableName(tableName string) error {
 	return nil
 }
 
-// validateMapperTableNames validates all table names used by the repository.
-func validateMapperTableNames() error {
-	mappers := []string{
-		(&OnCallUserMapper{}).Table(),
-		(&OnCallRotationMapper{}).Table(),
-		(&OnCallAssignmentMapper{}).Table(),
-		(&OnCallEscalationMapper{}).Table(),
+// validateTableNames validates all table names used by the repository.
+func validateTableNames() error {
+	tables := []string{
+		"oncall_users",
+		"oncall_rotations",
+		"oncall_assignments",
+		"oncall_escalations",
 	}
 
-	for _, tableName := range mappers {
+	for _, tableName := range tables {
 		if err := validateTableName(tableName); err != nil {
 			return err
 		}
@@ -122,68 +117,58 @@ func validateMapperTableNames() error {
 	return nil
 }
 
-// NewSQLiteOnCallRepository creates a new SQLite-backed OnCallRepository.
+// NewSQLiteOnCallRepository creates a new SQLite-backed OnCallRepository using sqlx.
 func NewSQLiteOnCallRepository(db database.Provider) (OnCallRepository, error) {
 	// Validate all table names at initialization time
-	if err := validateMapperTableNames(); err != nil {
+	if err := validateTableNames(); err != nil {
 		return nil, fmt.Errorf("failed to create repository: %w", err)
 	}
 
-	// Create mappers for each entity type
-	userMapper := &OnCallUserMapper{}
-	rotationMapper := &OnCallRotationMapper{}
-	assignmentMapper := &OnCallAssignmentMapper{}
-	escalationMapper := &OnCallEscalationMapper{}
-
-	// Create repositories using the mappers
-	var err error
-	userRepo, err := database.NewSQLRepository(db, userMapper)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user repository: %w", err)
-	}
-
-	rotationRepo, err := database.NewSQLRepository(db, rotationMapper)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rotation repository: %w", err)
-	}
-
-	assignmentRepo, err := database.NewSQLRepository(db, assignmentMapper)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create assignment repository: %w", err)
-	}
-
-	escalationRepo, err := database.NewSQLRepository(db, escalationMapper)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create escalation repository: %w", err)
-	}
-
 	return &SQLiteOnCallRepository{
-		db:             db,
-		userRepo:       userRepo,
-		rotationRepo:   rotationRepo,
-		assignmentRepo: assignmentRepo,
-		escalationRepo: escalationRepo,
+		db: db,
 	}, nil
 }
 
 // FindUserByID retrieves a user by their ID.
 func (r *SQLiteOnCallRepository) FindUserByID(ctx context.Context, id string) (*OnCallUser, error) {
-	return r.userRepo.FindByID(ctx, id)
+	var user OnCallUser
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_users WHERE id = ?"
+	err := r.db.Sqlx().GetContext(ctx, &user, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found with id %s: %w", id, err)
+		}
+		return nil, fmt.Errorf("error finding user with id %s: %w", id, err)
+	}
+	return &user, nil
 }
 
 // FindUserByGitHubUsername retrieves a user by their GitHub username.
 func (r *SQLiteOnCallRepository) FindUserByGitHubUsername(ctx context.Context, username string) (*OnCallUser, error) {
+	var user OnCallUser
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallUserMapper{}).Columns()) +
-		" FROM " + (&OnCallUserMapper{}).Table() + " WHERE github_username = ?"
-
-	row := r.db.DB().QueryRowContext(ctx, query, username)
-	return (&OnCallUserMapper{}).FromRow(row)
+	query := "SELECT * FROM oncall_users WHERE github_username = ?"
+	err := r.db.Sqlx().GetContext(ctx, &user, query, username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found with GitHub username %s: %w", username, err)
+		}
+		return nil, fmt.Errorf("error finding user with GitHub username %s: %w", username, err)
+	}
+	return &user, nil
 }
 
 // FindAllUsers retrieves all users.
 func (r *SQLiteOnCallRepository) FindAllUsers(ctx context.Context) ([]OnCallUser, error) {
-	return r.userRepo.FindAll(ctx)
+	var users []OnCallUser
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_users"
+	err := r.db.Sqlx().SelectContext(ctx, &users, query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying all users: %w", err)
+	}
+	return users, nil
 }
 
 // CreateUser inserts a new user.
@@ -197,46 +182,89 @@ func (r *SQLiteOnCallRepository) CreateUser(ctx context.Context, user *OnCallUse
 	if user.UpdatedAt.IsZero() {
 		user.UpdatedAt = time.Now()
 	}
-	return r.userRepo.Create(ctx, user)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		INSERT INTO oncall_users 
+		(id, github_username, name, email, is_active, created_at, updated_at) 
+		VALUES (:id, :github_username, :name, :email, :is_active, :created_at, :updated_at)
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, user)
+	if err != nil {
+		return fmt.Errorf("error creating user: %w", err)
+	}
+	return nil
 }
 
 // UpdateUser updates an existing user.
 func (r *SQLiteOnCallRepository) UpdateUser(ctx context.Context, user *OnCallUser) error {
 	user.UpdatedAt = time.Now()
-	return r.userRepo.Update(ctx, user)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		UPDATE oncall_users 
+		SET github_username = :github_username, 
+			name = :name, 
+			email = :email, 
+			is_active = :is_active, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, user)
+	if err != nil {
+		return fmt.Errorf("error updating user: %w", err)
+	}
+	return nil
 }
 
 // DeleteUser removes a user by their ID.
 func (r *SQLiteOnCallRepository) DeleteUser(ctx context.Context, id string) error {
-	return r.userRepo.Delete(ctx, id)
+	// #nosec G202 -- Table name is validated at initialization
+	query := "DELETE FROM oncall_users WHERE id = ?"
+	_, err := r.db.Sqlx().ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("error deleting user with id %s: %w", id, err)
+	}
+	return nil
 }
 
 // FindRotationByID retrieves a rotation by its ID.
 func (r *SQLiteOnCallRepository) FindRotationByID(ctx context.Context, id string) (*OnCallRotation, error) {
-	return r.rotationRepo.FindByID(ctx, id)
+	var rotation OnCallRotation
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_rotations WHERE id = ?"
+	err := r.db.Sqlx().GetContext(ctx, &rotation, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("rotation not found with id %s: %w", id, err)
+		}
+		return nil, fmt.Errorf("error finding rotation with id %s: %w", id, err)
+	}
+	return &rotation, nil
 }
 
 // FindRotationsByRepository retrieves rotations by repository.
-func (r *SQLiteOnCallRepository) FindRotationsByRepository(
-	ctx context.Context,
-	repository string,
-) ([]OnCallRotation, error) {
+func (r *SQLiteOnCallRepository) FindRotationsByRepository(ctx context.Context, repository string) ([]OnCallRotation, error) {
+	var rotations []OnCallRotation
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallRotationMapper{}).Columns()) +
-		" FROM " + (&OnCallRotationMapper{}).Table() + " WHERE repository = ?"
-
-	rows, err := r.db.DB().QueryContext(ctx, query, repository)
+	query := "SELECT * FROM oncall_rotations WHERE repository = ?"
+	err := r.db.Sqlx().SelectContext(ctx, &rotations, query, repository)
 	if err != nil {
 		return nil, fmt.Errorf("error querying rotations by repository: %w", err)
 	}
-	defer rows.Close()
-
-	return (&OnCallRotationMapper{}).FromRows(rows)
+	return rotations, nil
 }
 
 // FindAllRotations retrieves all rotations.
 func (r *SQLiteOnCallRepository) FindAllRotations(ctx context.Context) ([]OnCallRotation, error) {
-	return r.rotationRepo.FindAll(ctx)
+	var rotations []OnCallRotation
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_rotations"
+	err := r.db.Sqlx().SelectContext(ctx, &rotations, query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying all rotations: %w", err)
+	}
+	return rotations, nil
 }
 
 // CreateRotation inserts a new rotation.
@@ -250,69 +278,104 @@ func (r *SQLiteOnCallRepository) CreateRotation(ctx context.Context, rotation *O
 	if rotation.UpdatedAt.IsZero() {
 		rotation.UpdatedAt = time.Now()
 	}
-	return r.rotationRepo.Create(ctx, rotation)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		INSERT INTO oncall_rotations 
+		(id, name, description, repository, is_active, created_at, updated_at) 
+		VALUES (:id, :name, :description, :repository, :is_active, :created_at, :updated_at)
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, rotation)
+	if err != nil {
+		return fmt.Errorf("error creating rotation: %w", err)
+	}
+	return nil
 }
 
 // UpdateRotation updates an existing rotation.
 func (r *SQLiteOnCallRepository) UpdateRotation(ctx context.Context, rotation *OnCallRotation) error {
 	rotation.UpdatedAt = time.Now()
-	return r.rotationRepo.Update(ctx, rotation)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		UPDATE oncall_rotations 
+		SET name = :name, 
+			description = :description, 
+			repository = :repository, 
+			is_active = :is_active, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, rotation)
+	if err != nil {
+		return fmt.Errorf("error updating rotation: %w", err)
+	}
+	return nil
 }
 
 // DeleteRotation removes a rotation by its ID.
 func (r *SQLiteOnCallRepository) DeleteRotation(ctx context.Context, id string) error {
-	return r.rotationRepo.Delete(ctx, id)
+	// #nosec G202 -- Table name is validated at initialization
+	query := "DELETE FROM oncall_rotations WHERE id = ?"
+	_, err := r.db.Sqlx().ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("error deleting rotation with id %s: %w", id, err)
+	}
+	return nil
 }
 
 // FindAssignmentByID retrieves an assignment by its ID.
 func (r *SQLiteOnCallRepository) FindAssignmentByID(ctx context.Context, id string) (*OnCallAssignment, error) {
-	return r.assignmentRepo.FindByID(ctx, id)
+	var assignment OnCallAssignment
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_assignments WHERE id = ?"
+	err := r.db.Sqlx().GetContext(ctx, &assignment, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("assignment not found with id %s: %w", id, err)
+		}
+		return nil, fmt.Errorf("error finding assignment with id %s: %w", id, err)
+	}
+	return &assignment, nil
 }
 
 // FindCurrentAssignmentByRotation retrieves the current assignment for a rotation.
-func (r *SQLiteOnCallRepository) FindCurrentAssignmentByRotation(
-	ctx context.Context,
-	rotationID string,
-) (*OnCallAssignment, error) {
+func (r *SQLiteOnCallRepository) FindCurrentAssignmentByRotation(ctx context.Context, rotationID string) (*OnCallAssignment, error) {
+	var assignment OnCallAssignment
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallAssignmentMapper{}).Columns()) +
-		" FROM " + (&OnCallAssignmentMapper{}).Table() + " WHERE rotation_id = ? AND is_current = 1"
-
-	row := r.db.DB().QueryRowContext(ctx, query, rotationID)
-	return (&OnCallAssignmentMapper{}).FromRow(row)
+	query := "SELECT * FROM oncall_assignments WHERE rotation_id = ? AND is_current = 1"
+	err := r.db.Sqlx().GetContext(ctx, &assignment, query, rotationID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no current assignment found for rotation %s: %w", rotationID, err)
+		}
+		return nil, fmt.Errorf("error finding current assignment for rotation %s: %w", rotationID, err)
+	}
+	return &assignment, nil
 }
 
 // FindAssignmentsByUser retrieves assignments for a user.
 func (r *SQLiteOnCallRepository) FindAssignmentsByUser(ctx context.Context, userID string) ([]OnCallAssignment, error) {
+	var assignments []OnCallAssignment
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallAssignmentMapper{}).Columns()) +
-		" FROM " + (&OnCallAssignmentMapper{}).Table() + " WHERE user_id = ?"
-
-	rows, err := r.db.DB().QueryContext(ctx, query, userID)
+	query := "SELECT * FROM oncall_assignments WHERE user_id = ?"
+	err := r.db.Sqlx().SelectContext(ctx, &assignments, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying assignments by user: %w", err)
 	}
-	defer rows.Close()
-
-	return (&OnCallAssignmentMapper{}).FromRows(rows)
+	return assignments, nil
 }
 
 // FindAssignmentsByRotation retrieves assignments for a rotation.
-func (r *SQLiteOnCallRepository) FindAssignmentsByRotation(
-	ctx context.Context,
-	rotationID string,
-) ([]OnCallAssignment, error) {
+func (r *SQLiteOnCallRepository) FindAssignmentsByRotation(ctx context.Context, rotationID string) ([]OnCallAssignment, error) {
+	var assignments []OnCallAssignment
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallAssignmentMapper{}).Columns()) +
-		" FROM " + (&OnCallAssignmentMapper{}).Table() + " WHERE rotation_id = ?"
-
-	rows, err := r.db.DB().QueryContext(ctx, query, rotationID)
+	query := "SELECT * FROM oncall_assignments WHERE rotation_id = ?"
+	err := r.db.Sqlx().SelectContext(ctx, &assignments, query, rotationID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying assignments by rotation: %w", err)
 	}
-	defer rows.Close()
-
-	return (&OnCallAssignmentMapper{}).FromRows(rows)
+	return assignments, nil
 }
 
 // CreateAssignment inserts a new assignment.
@@ -332,7 +395,7 @@ func (r *SQLiteOnCallRepository) CreateAssignment(ctx context.Context, assignmen
 		err := r.Transaction(ctx, func(tx OnCallTransaction) error {
 			// Clear current flag from all other assignments for this rotation
 			resetQuery := "UPDATE oncall_assignments SET is_current = 0, updated_at = CURRENT_TIMESTAMP WHERE rotation_id = ? AND id != ?"
-			_, err := r.db.DB().ExecContext(ctx, resetQuery, assignment.RotationID, assignment.ID)
+			_, err := r.db.Sqlx().ExecContext(ctx, resetQuery, assignment.RotationID, assignment.ID)
 			if err != nil {
 				return fmt.Errorf("error resetting current assignments: %w", err)
 			}
@@ -346,7 +409,17 @@ func (r *SQLiteOnCallRepository) CreateAssignment(ctx context.Context, assignmen
 		return nil
 	}
 
-	return r.assignmentRepo.Create(ctx, assignment)
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		INSERT INTO oncall_assignments 
+		(id, rotation_id, user_id, start_time, end_time, is_current, created_at, updated_at) 
+		VALUES (:id, :rotation_id, :user_id, :start_time, :end_time, :is_current, :created_at, :updated_at)
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, assignment)
+	if err != nil {
+		return fmt.Errorf("error creating assignment: %w", err)
+	}
+	return nil
 }
 
 // UpdateAssignment updates an existing assignment.
@@ -358,7 +431,7 @@ func (r *SQLiteOnCallRepository) UpdateAssignment(ctx context.Context, assignmen
 		err := r.Transaction(ctx, func(tx OnCallTransaction) error {
 			// Clear current flag from all other assignments for this rotation
 			resetQuery := "UPDATE oncall_assignments SET is_current = 0, updated_at = CURRENT_TIMESTAMP WHERE rotation_id = ? AND id != ?"
-			_, err := r.db.DB().ExecContext(ctx, resetQuery, assignment.RotationID, assignment.ID)
+			_, err := r.db.Sqlx().ExecContext(ctx, resetQuery, assignment.RotationID, assignment.ID)
 			if err != nil {
 				return fmt.Errorf("error resetting current assignments: %w", err)
 			}
@@ -372,81 +445,102 @@ func (r *SQLiteOnCallRepository) UpdateAssignment(ctx context.Context, assignmen
 		return nil
 	}
 
-	return r.assignmentRepo.Update(ctx, assignment)
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		UPDATE oncall_assignments 
+		SET rotation_id = :rotation_id, 
+			user_id = :user_id, 
+			start_time = :start_time, 
+			end_time = :end_time, 
+			is_current = :is_current, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, assignment)
+	if err != nil {
+		return fmt.Errorf("error updating assignment: %w", err)
+	}
+	return nil
 }
 
 // DeleteAssignment removes an assignment by its ID.
 func (r *SQLiteOnCallRepository) DeleteAssignment(ctx context.Context, id string) error {
-	return r.assignmentRepo.Delete(ctx, id)
+	// #nosec G202 -- Table name is validated at initialization
+	query := "DELETE FROM oncall_assignments WHERE id = ?"
+	_, err := r.db.Sqlx().ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("error deleting assignment with id %s: %w", id, err)
+	}
+	return nil
 }
 
 // FindEscalationByID retrieves an escalation by its ID.
 func (r *SQLiteOnCallRepository) FindEscalationByID(ctx context.Context, id string) (*OnCallEscalation, error) {
-	return r.escalationRepo.FindByID(ctx, id)
+	var escalation OnCallEscalation
+	// #nosec G202 -- Table name is validated at initialization
+	query := "SELECT * FROM oncall_escalations WHERE id = ?"
+	err := r.db.Sqlx().GetContext(ctx, &escalation, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("escalation not found with id %s: %w", id, err)
+		}
+		return nil, fmt.Errorf("error finding escalation with id %s: %w", id, err)
+	}
+	return &escalation, nil
 }
 
 // FindEscalationsByStatus retrieves escalations by status.
-func (r *SQLiteOnCallRepository) FindEscalationsByStatus(
-	ctx context.Context,
-	status EscalationStatus,
-) ([]OnCallEscalation, error) {
+func (r *SQLiteOnCallRepository) FindEscalationsByStatus(ctx context.Context, status EscalationStatus) ([]OnCallEscalation, error) {
+	var escalations []OnCallEscalation
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallEscalationMapper{}).Columns()) +
-		" FROM " + (&OnCallEscalationMapper{}).Table() + " WHERE status = ?"
-
-	rows, err := r.db.DB().QueryContext(ctx, query, string(status))
+	query := "SELECT * FROM oncall_escalations WHERE status = ?"
+	err := r.db.Sqlx().SelectContext(ctx, &escalations, query, string(status))
 	if err != nil {
 		return nil, fmt.Errorf("error querying escalations by status: %w", err)
 	}
-	defer rows.Close()
-
-	return (&OnCallEscalationMapper{}).FromRows(rows)
+	return escalations, nil
 }
 
 // FindEscalationsByAssignment retrieves escalations for an assignment.
-func (r *SQLiteOnCallRepository) FindEscalationsByAssignment(
-	ctx context.Context,
-	assignmentID string,
-) ([]OnCallEscalation, error) {
+func (r *SQLiteOnCallRepository) FindEscalationsByAssignment(ctx context.Context, assignmentID string) ([]OnCallEscalation, error) {
+	var escalations []OnCallEscalation
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallEscalationMapper{}).Columns()) +
-		" FROM " + (&OnCallEscalationMapper{}).Table() + " WHERE assignment_id = ?"
-
-	rows, err := r.db.DB().QueryContext(ctx, query, assignmentID)
+	query := "SELECT * FROM oncall_escalations WHERE assignment_id = ?"
+	err := r.db.Sqlx().SelectContext(ctx, &escalations, query, assignmentID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying escalations by assignment: %w", err)
 	}
-	defer rows.Close()
-
-	return (&OnCallEscalationMapper{}).FromRows(rows)
+	return escalations, nil
 }
 
 // FindEscalationByIssue retrieves an escalation for an issue.
-func (r *SQLiteOnCallRepository) FindEscalationByIssue(
-	ctx context.Context,
-	repository string,
-	issueNumber int,
-) (*OnCallEscalation, error) {
+func (r *SQLiteOnCallRepository) FindEscalationByIssue(ctx context.Context, repository string, issueNumber int) (*OnCallEscalation, error) {
+	var escalation OnCallEscalation
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallEscalationMapper{}).Columns()) +
-		" FROM " + (&OnCallEscalationMapper{}).Table() + " WHERE repository = ? AND issue_number = ?"
-
-	row := r.db.DB().QueryRowContext(ctx, query, repository, issueNumber)
-	return (&OnCallEscalationMapper{}).FromRow(row)
+	query := "SELECT * FROM oncall_escalations WHERE repository = ? AND issue_number = ?"
+	err := r.db.Sqlx().GetContext(ctx, &escalation, query, repository, issueNumber)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("escalation not found for issue %d in repository %s: %w", issueNumber, repository, err)
+		}
+		return nil, fmt.Errorf("error finding escalation for issue %d in repository %s: %w", issueNumber, repository, err)
+	}
+	return &escalation, nil
 }
 
 // FindEscalationByPR retrieves an escalation for a PR.
-func (r *SQLiteOnCallRepository) FindEscalationByPR(
-	ctx context.Context,
-	repository string,
-	prNumber int,
-) (*OnCallEscalation, error) {
+func (r *SQLiteOnCallRepository) FindEscalationByPR(ctx context.Context, repository string, prNumber int) (*OnCallEscalation, error) {
+	var escalation OnCallEscalation
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns((&OnCallEscalationMapper{}).Columns()) +
-		" FROM " + (&OnCallEscalationMapper{}).Table() + " WHERE repository = ? AND pr_number = ?"
-
-	row := r.db.DB().QueryRowContext(ctx, query, repository, prNumber)
-	return (&OnCallEscalationMapper{}).FromRow(row)
+	query := "SELECT * FROM oncall_escalations WHERE repository = ? AND pr_number = ?"
+	err := r.db.Sqlx().GetContext(ctx, &escalation, query, repository, prNumber)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("escalation not found for PR %d in repository %s: %w", prNumber, repository, err)
+		}
+		return nil, fmt.Errorf("error finding escalation for PR %d in repository %s: %w", prNumber, repository, err)
+	}
+	return &escalation, nil
 }
 
 // CreateEscalation inserts a new escalation.
@@ -460,37 +554,72 @@ func (r *SQLiteOnCallRepository) CreateEscalation(ctx context.Context, escalatio
 	if escalation.UpdatedAt.IsZero() {
 		escalation.UpdatedAt = time.Now()
 	}
-	return r.escalationRepo.Create(ctx, escalation)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		INSERT INTO oncall_escalations 
+		(id, assignment_id, issue_number, pr_number, repository, status, escalation_time, resolution_time, created_at, updated_at) 
+		VALUES (:id, :assignment_id, :issue_number, :pr_number, :repository, :status, :escalation_time, :resolution_time, :created_at, :updated_at)
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, escalation)
+	if err != nil {
+		return fmt.Errorf("error creating escalation: %w", err)
+	}
+	return nil
 }
 
 // UpdateEscalation updates an existing escalation.
 func (r *SQLiteOnCallRepository) UpdateEscalation(ctx context.Context, escalation *OnCallEscalation) error {
 	escalation.UpdatedAt = time.Now()
-	return r.escalationRepo.Update(ctx, escalation)
+
+	// #nosec G202 -- Table name is validated at initialization
+	query := `
+		UPDATE oncall_escalations 
+		SET assignment_id = :assignment_id, 
+			issue_number = :issue_number, 
+			pr_number = :pr_number, 
+			repository = :repository, 
+			status = :status, 
+			escalation_time = :escalation_time, 
+			resolution_time = :resolution_time, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, escalation)
+	if err != nil {
+		return fmt.Errorf("error updating escalation: %w", err)
+	}
+	return nil
 }
 
 // DeleteEscalation removes an escalation by its ID.
 func (r *SQLiteOnCallRepository) DeleteEscalation(ctx context.Context, id string) error {
-	return r.escalationRepo.Delete(ctx, id)
+	// #nosec G202 -- Table name is validated at initialization
+	query := "DELETE FROM oncall_escalations WHERE id = ?"
+	_, err := r.db.Sqlx().ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("error deleting escalation with id %s: %w", id, err)
+	}
+	return nil
 }
 
 // Transaction executes a function within a database transaction.
 func (r *SQLiteOnCallRepository) Transaction(ctx context.Context, fn func(tx OnCallTransaction) error) error {
 	// Begin a database transaction
-	sqlTx, err := r.db.DB().BeginTx(ctx, nil)
+	sqlxTx, err := r.db.Sqlx().BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
 	// Create a transaction-scoped repository
 	txRepo := &SQLiteOnCallTransaction{
-		tx: sqlTx,
+		tx: sqlxTx,
 	}
 
 	// Execute the function
 	if err := fn(txRepo); err != nil {
 		// Attempt rollback, but don't override original error
-		rollbackErr := sqlTx.Rollback()
+		rollbackErr := sqlxTx.Rollback()
 		if rollbackErr != nil {
 			return fmt.Errorf("transaction failed: %w (rollback failed: %w)", err, rollbackErr)
 		}
@@ -498,7 +627,7 @@ func (r *SQLiteOnCallRepository) Transaction(ctx context.Context, fn func(tx OnC
 	}
 
 	// Commit the transaction
-	if err := sqlTx.Commit(); err != nil {
+	if err := sqlxTx.Commit(); err != nil {
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
@@ -514,7 +643,7 @@ func (r *SQLiteOnCallRepository) EnsureSchema(ctx context.Context) error {
 
 // SQLiteOnCallTransaction implements OnCallTransaction for SQLite databases.
 type SQLiteOnCallTransaction struct {
-	tx *sql.Tx
+	tx *sqlx.Tx
 }
 
 // Ensure SQLiteOnCallTransaction implements OnCallTransaction.
@@ -522,227 +651,184 @@ var _ OnCallTransaction = (*SQLiteOnCallTransaction)(nil)
 
 // CreateUser inserts a new user within a transaction.
 func (t *SQLiteOnCallTransaction) CreateUser(ctx context.Context, user *OnCallUser) error {
-	columns := (&OnCallUserMapper{}).Columns()
-	placeholders := createPlaceholders(len(columns))
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + (&OnCallUserMapper{}).Table() +
-		" (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
-
-	_, err := t.tx.ExecContext(ctx, query, (&OnCallUserMapper{}).ToRow(user)...)
+	query := `
+		INSERT INTO oncall_users 
+		(id, github_username, name, email, is_active, created_at, updated_at) 
+		VALUES (:id, :github_username, :name, :email, :is_active, :created_at, :updated_at)
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, user)
 	if err != nil {
 		return fmt.Errorf("error creating user in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // UpdateUser updates an existing user within a transaction.
 func (t *SQLiteOnCallTransaction) UpdateUser(ctx context.Context, user *OnCallUser) error {
-	columns := (&OnCallUserMapper{}).Columns()
-	setClause := createSetClause(columns)
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + (&OnCallUserMapper{}).Table() +
-		" SET " + setClause + " WHERE id = ?"
-
-	args := (&OnCallUserMapper{}).ToRow(user)
-	args = append(args, user.ID)
-
-	_, err := t.tx.ExecContext(ctx, query, args...)
+	query := `
+		UPDATE oncall_users 
+		SET github_username = :github_username, 
+			name = :name, 
+			email = :email, 
+			is_active = :is_active, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, user)
 	if err != nil {
 		return fmt.Errorf("error updating user in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // DeleteUser removes a user by their ID within a transaction.
 func (t *SQLiteOnCallTransaction) DeleteUser(ctx context.Context, id string) error {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + (&OnCallUserMapper{}).Table() + " WHERE id = ?"
-
+	query := "DELETE FROM oncall_users WHERE id = ?"
 	_, err := t.tx.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("error deleting user in transaction: %w", err)
+		return fmt.Errorf("error deleting user in transaction with id %s: %w", id, err)
 	}
-
 	return nil
 }
 
 // CreateRotation inserts a new rotation within a transaction.
 func (t *SQLiteOnCallTransaction) CreateRotation(ctx context.Context, rotation *OnCallRotation) error {
-	columns := (&OnCallRotationMapper{}).Columns()
-	placeholders := createPlaceholders(len(columns))
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + (&OnCallRotationMapper{}).Table() +
-		" (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
-
-	_, err := t.tx.ExecContext(ctx, query, (&OnCallRotationMapper{}).ToRow(rotation)...)
+	query := `
+		INSERT INTO oncall_rotations 
+		(id, name, description, repository, is_active, created_at, updated_at) 
+		VALUES (:id, :name, :description, :repository, :is_active, :created_at, :updated_at)
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, rotation)
 	if err != nil {
 		return fmt.Errorf("error creating rotation in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // UpdateRotation updates an existing rotation within a transaction.
 func (t *SQLiteOnCallTransaction) UpdateRotation(ctx context.Context, rotation *OnCallRotation) error {
-	columns := (&OnCallRotationMapper{}).Columns()
-	setClause := createSetClause(columns)
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + (&OnCallRotationMapper{}).Table() +
-		" SET " + setClause + " WHERE id = ?"
-
-	args := (&OnCallRotationMapper{}).ToRow(rotation)
-	args = append(args, rotation.ID)
-
-	_, err := t.tx.ExecContext(ctx, query, args...)
+	query := `
+		UPDATE oncall_rotations 
+		SET name = :name, 
+			description = :description, 
+			repository = :repository, 
+			is_active = :is_active, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, rotation)
 	if err != nil {
 		return fmt.Errorf("error updating rotation in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // DeleteRotation removes a rotation by its ID within a transaction.
 func (t *SQLiteOnCallTransaction) DeleteRotation(ctx context.Context, id string) error {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + (&OnCallRotationMapper{}).Table() + " WHERE id = ?"
-
+	query := "DELETE FROM oncall_rotations WHERE id = ?"
 	_, err := t.tx.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("error deleting rotation in transaction: %w", err)
+		return fmt.Errorf("error deleting rotation in transaction with id %s: %w", id, err)
 	}
-
 	return nil
 }
 
 // CreateAssignment inserts a new assignment within a transaction.
 func (t *SQLiteOnCallTransaction) CreateAssignment(ctx context.Context, assignment *OnCallAssignment) error {
-	columns := (&OnCallAssignmentMapper{}).Columns()
-	placeholders := createPlaceholders(len(columns))
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + (&OnCallAssignmentMapper{}).Table() +
-		" (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
-
-	_, err := t.tx.ExecContext(ctx, query, (&OnCallAssignmentMapper{}).ToRow(assignment)...)
+	query := `
+		INSERT INTO oncall_assignments 
+		(id, rotation_id, user_id, start_time, end_time, is_current, created_at, updated_at) 
+		VALUES (:id, :rotation_id, :user_id, :start_time, :end_time, :is_current, :created_at, :updated_at)
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, assignment)
 	if err != nil {
 		return fmt.Errorf("error creating assignment in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // UpdateAssignment updates an existing assignment within a transaction.
 func (t *SQLiteOnCallTransaction) UpdateAssignment(ctx context.Context, assignment *OnCallAssignment) error {
-	columns := (&OnCallAssignmentMapper{}).Columns()
-	setClause := createSetClause(columns)
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + (&OnCallAssignmentMapper{}).Table() +
-		" SET " + setClause + " WHERE id = ?"
-
-	args := (&OnCallAssignmentMapper{}).ToRow(assignment)
-	args = append(args, assignment.ID)
-
-	_, err := t.tx.ExecContext(ctx, query, args...)
+	query := `
+		UPDATE oncall_assignments 
+		SET rotation_id = :rotation_id, 
+			user_id = :user_id, 
+			start_time = :start_time, 
+			end_time = :end_time, 
+			is_current = :is_current, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, assignment)
 	if err != nil {
 		return fmt.Errorf("error updating assignment in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // DeleteAssignment removes an assignment by its ID within a transaction.
 func (t *SQLiteOnCallTransaction) DeleteAssignment(ctx context.Context, id string) error {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + (&OnCallAssignmentMapper{}).Table() + " WHERE id = ?"
-
+	query := "DELETE FROM oncall_assignments WHERE id = ?"
 	_, err := t.tx.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("error deleting assignment in transaction: %w", err)
+		return fmt.Errorf("error deleting assignment in transaction with id %s: %w", id, err)
 	}
-
 	return nil
 }
 
 // CreateEscalation inserts a new escalation within a transaction.
 func (t *SQLiteOnCallTransaction) CreateEscalation(ctx context.Context, escalation *OnCallEscalation) error {
-	columns := (&OnCallEscalationMapper{}).Columns()
-	placeholders := createPlaceholders(len(columns))
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + (&OnCallEscalationMapper{}).Table() +
-		" (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
-
-	_, err := t.tx.ExecContext(ctx, query, (&OnCallEscalationMapper{}).ToRow(escalation)...)
+	query := `
+		INSERT INTO oncall_escalations 
+		(id, assignment_id, issue_number, pr_number, repository, status, escalation_time, resolution_time, created_at, updated_at) 
+		VALUES (:id, :assignment_id, :issue_number, :pr_number, :repository, :status, :escalation_time, :resolution_time, :created_at, :updated_at)
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, escalation)
 	if err != nil {
 		return fmt.Errorf("error creating escalation in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // UpdateEscalation updates an existing escalation within a transaction.
 func (t *SQLiteOnCallTransaction) UpdateEscalation(ctx context.Context, escalation *OnCallEscalation) error {
-	columns := (&OnCallEscalationMapper{}).Columns()
-	setClause := createSetClause(columns)
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + (&OnCallEscalationMapper{}).Table() +
-		" SET " + setClause + " WHERE id = ?"
-
-	args := (&OnCallEscalationMapper{}).ToRow(escalation)
-	args = append(args, escalation.ID)
-
-	_, err := t.tx.ExecContext(ctx, query, args...)
+	query := `
+		UPDATE oncall_escalations 
+		SET assignment_id = :assignment_id, 
+			issue_number = :issue_number, 
+			pr_number = :pr_number, 
+			repository = :repository, 
+			status = :status, 
+			escalation_time = :escalation_time, 
+			resolution_time = :resolution_time, 
+			updated_at = :updated_at 
+		WHERE id = :id
+	`
+	_, err := t.tx.NamedExecContext(ctx, query, escalation)
 	if err != nil {
 		return fmt.Errorf("error updating escalation in transaction: %w", err)
 	}
-
 	return nil
 }
 
 // DeleteEscalation removes an escalation by its ID within a transaction.
 func (t *SQLiteOnCallTransaction) DeleteEscalation(ctx context.Context, id string) error {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + (&OnCallEscalationMapper{}).Table() + " WHERE id = ?"
-
+	query := "DELETE FROM oncall_escalations WHERE id = ?"
 	_, err := t.tx.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("error deleting escalation in transaction: %w", err)
+		return fmt.Errorf("error deleting escalation in transaction with id %s: %w", id, err)
 	}
-
 	return nil
-}
-
-// Helper functions for SQL query generation
-
-func joinColumns(columns []string) string {
-	result := ""
-	for i, col := range columns {
-		if i > 0 {
-			result += ", "
-		}
-		result += col
-	}
-	return result
-}
-
-func createPlaceholders(count int) string {
-	result := ""
-	for i := 0; i < count; i++ {
-		if i > 0 {
-			result += ", "
-		}
-		result += "?"
-	}
-	return result
-}
-
-func createSetClause(columns []string) string {
-	result := ""
-	for i, col := range columns {
-		if i > 0 {
-			result += ", "
-		}
-		result += col + " = ?"
-	}
-	return result
 }

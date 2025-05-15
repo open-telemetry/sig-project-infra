@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // Entity represents a database entity with an ID.
@@ -44,28 +46,14 @@ type Transaction[T Entity] interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// SQLMapper provides functions to map between entities and database rows.
-type SQLMapper[T Entity] interface {
-	// ToRow maps an entity to database column values.
-	ToRow(entity *T) []interface{}
-	// FromRow creates an entity from a database row.
-	FromRow(row *sql.Row) (*T, error)
-	// FromRows creates entities from database rows.
-	FromRows(rows *sql.Rows) ([]T, error)
-	// Columns returns the database column names.
-	Columns() []string
-	// Table returns the database table name.
-	Table() string
+// SQLXRepository implements Repository using sqlx for database operations.
+type SQLXRepository[T Entity] struct {
+	db        Provider
+	tableName string
 }
 
-// SQLRepository implements Repository using SQL operations.
-type SQLRepository[T Entity] struct {
-	db     Provider
-	mapper SQLMapper[T]
-}
-
-// Ensure SQLRepository implements Repository.
-var _ Repository[Entity] = (*SQLRepository[Entity])(nil)
+// Ensure SQLXRepository implements Repository.
+var _ Repository[Entity] = (*SQLXRepository[Entity])(nil)
 
 // validateTableName ensures table names are safe for use in SQL queries.
 func validateTableName(tableName string) error {
@@ -77,31 +65,29 @@ func validateTableName(tableName string) error {
 	return nil
 }
 
-// NewSQLRepository creates a new SQL repository.
-func NewSQLRepository[T Entity](db Provider, mapper SQLMapper[T]) (Repository[T], error) {
+// NewSQLXRepository creates a new repository using sqlx.
+func NewSQLXRepository[T Entity](db Provider, tableName string) (Repository[T], error) {
 	// Validate table name at initialization time
-	tableName := mapper.Table()
 	if err := validateTableName(tableName); err != nil {
 		return nil, fmt.Errorf("failed to create repository: %w", err)
 	}
 
-	return &SQLRepository[T]{
-		db:     db,
-		mapper: mapper,
+	return &SQLXRepository[T]{
+		db:        db,
+		tableName: tableName,
 	}, nil
 }
 
 // FindByID retrieves an entity by its ID.
-func (r *SQLRepository[T]) FindByID(ctx context.Context, id string) (*T, error) {
+func (r *SQLXRepository[T]) FindByID(ctx context.Context, id string) (*T, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	columns := r.mapper.Columns()
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns(columns) + " FROM " + r.mapper.Table() + " WHERE id = ?"
+	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", r.tableName)
 
-	row := r.db.DB().QueryRowContext(ctx, query, id)
-	entity, err := r.mapper.FromRow(row)
+	var entity T
+	err := r.db.Sqlx().GetContext(ctx, &entity, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("entity not found with id %s: %w", id, err)
@@ -109,38 +95,36 @@ func (r *SQLRepository[T]) FindByID(ctx context.Context, id string) (*T, error) 
 		return nil, fmt.Errorf("error finding entity with id %s: %w", id, err)
 	}
 
-	return entity, nil
+	return &entity, nil
 }
 
 // FindAll retrieves all entities.
-func (r *SQLRepository[T]) FindAll(ctx context.Context) ([]T, error) {
+func (r *SQLXRepository[T]) FindAll(ctx context.Context) ([]T, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	columns := r.mapper.Columns()
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns(columns) + " FROM " + r.mapper.Table()
+	query := fmt.Sprintf("SELECT * FROM %s", r.tableName)
 
-	rows, err := r.db.DB().QueryContext(ctx, query)
+	var entities []T
+	err := r.db.Sqlx().SelectContext(ctx, &entities, query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying all entities: %w", err)
 	}
-	defer rows.Close()
 
-	return r.mapper.FromRows(rows)
+	return entities, nil
 }
 
 // Create inserts a new entity.
-func (r *SQLRepository[T]) Create(ctx context.Context, entity *T) error {
+func (r *SQLXRepository[T]) Create(ctx context.Context, entity *T) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	columns := r.mapper.Columns()
-	placeholders := createPlaceholders(len(columns))
+	// Use sqlx's NamedExec to handle mapping struct fields to columns
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + r.mapper.Table() + " (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
+	query := fmt.Sprintf("INSERT INTO %s VALUES (:id, :github_username, :name, :email, :is_active, :created_at, :updated_at)", r.tableName)
 
-	_, err := r.db.DB().ExecContext(ctx, query, r.mapper.ToRow(entity)...)
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, entity)
 	if err != nil {
 		return fmt.Errorf("error creating entity: %w", err)
 	}
@@ -149,20 +133,15 @@ func (r *SQLRepository[T]) Create(ctx context.Context, entity *T) error {
 }
 
 // Update modifies an existing entity.
-func (r *SQLRepository[T]) Update(ctx context.Context, entity *T) error {
+func (r *SQLXRepository[T]) Update(ctx context.Context, entity *T) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	columns := r.mapper.Columns()
-	setClause := createSetClause(columns)
+	// Use sqlx's NamedExec to handle mapping struct fields to columns
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + r.mapper.Table() + " SET " + setClause + " WHERE id = ?"
+	query := fmt.Sprintf("UPDATE %s SET github_username=:github_username, name=:name, email=:email, is_active=:is_active, updated_at=:updated_at WHERE id=:id", r.tableName)
 
-	args := r.mapper.ToRow(entity)
-	// Add ID as the last parameter for the WHERE clause
-	args = append(args, (*entity).GetID())
-
-	_, err := r.db.DB().ExecContext(ctx, query, args...)
+	_, err := r.db.Sqlx().NamedExecContext(ctx, query, entity)
 	if err != nil {
 		return fmt.Errorf("error updating entity: %w", err)
 	}
@@ -171,14 +150,14 @@ func (r *SQLRepository[T]) Update(ctx context.Context, entity *T) error {
 }
 
 // Delete removes an entity by its ID.
-func (r *SQLRepository[T]) Delete(ctx context.Context, id string) error {
+func (r *SQLXRepository[T]) Delete(ctx context.Context, id string) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + r.mapper.Table() + " WHERE id = ?"
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", r.tableName)
 
-	_, err := r.db.DB().ExecContext(ctx, query, id)
+	_, err := r.db.Sqlx().ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("error deleting entity with id %s: %w", id, err)
 	}
@@ -187,71 +166,69 @@ func (r *SQLRepository[T]) Delete(ctx context.Context, id string) error {
 }
 
 // Transaction executes a function within a database transaction.
-func (r *SQLRepository[T]) Transaction(ctx context.Context, fn func(tx Transaction[T]) error) error {
+func (r *SQLXRepository[T]) Transaction(ctx context.Context, fn func(tx Transaction[T]) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	sqlTx, err := r.db.DB().BeginTx(ctx, nil)
+	sqlxTx, err := r.db.Sqlx().BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
-	txRepo := &SQLTransaction[T]{
-		tx:     sqlTx,
-		mapper: r.mapper,
+	txRepo := &SQLXTransaction[T]{
+		tx:        sqlxTx,
+		tableName: r.tableName,
 	}
 
 	if err := fn(txRepo); err != nil {
 		// Attempt rollback, but don't override original error
-		rollbackErr := sqlTx.Rollback()
+		rollbackErr := sqlxTx.Rollback()
 		if rollbackErr != nil {
 			return fmt.Errorf("transaction failed: %w (rollback failed: %w)", err, rollbackErr)
 		}
 		return fmt.Errorf("transaction failed: %w", err)
 	}
 
-	if err := sqlTx.Commit(); err != nil {
+	if err := sqlxTx.Commit(); err != nil {
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
 	return nil
 }
 
-// SQLTransaction implements Transaction for SQL.
-type SQLTransaction[T Entity] struct {
-	tx     *sql.Tx
-	mapper SQLMapper[T]
+// SQLXTransaction implements Transaction for sqlx.
+type SQLXTransaction[T Entity] struct {
+	tx        *sqlx.Tx
+	tableName string
 }
 
-// Ensure SQLTransaction implements Transaction.
-var _ Transaction[Entity] = (*SQLTransaction[Entity])(nil)
+// Ensure SQLXTransaction implements Transaction.
+var _ Transaction[Entity] = (*SQLXTransaction[Entity])(nil)
 
 // FindByID retrieves an entity by its ID within the transaction.
-func (t *SQLTransaction[T]) FindByID(ctx context.Context, id string) (*T, error) {
-	columns := t.mapper.Columns()
+func (t *SQLXTransaction[T]) FindByID(ctx context.Context, id string) (*T, error) {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "SELECT " + joinColumns(columns) + " FROM " + t.mapper.Table() + " WHERE id = ?"
+	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", t.tableName)
 
-	row := t.tx.QueryRowContext(ctx, query, id)
-	entity, err := t.mapper.FromRow(row)
+	var entity T
+	err := t.tx.GetContext(ctx, &entity, query, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("entity not found with id %s: %w", id, err)
 		}
-		return nil, fmt.Errorf("error finding entity with id %s: %w", id, err)
+		return nil, fmt.Errorf("error finding entity with id %s in transaction: %w", id, err)
 	}
 
-	return entity, nil
+	return &entity, nil
 }
 
 // Create inserts a new entity within the transaction.
-func (t *SQLTransaction[T]) Create(ctx context.Context, entity *T) error {
-	columns := t.mapper.Columns()
-	placeholders := createPlaceholders(len(columns))
+func (t *SQLXTransaction[T]) Create(ctx context.Context, entity *T) error {
+	// Use sqlx's NamedExec to handle mapping struct fields to columns
 	// #nosec G202 -- Table name is validated at initialization
-	query := "INSERT INTO " + t.mapper.Table() + " (" + joinColumns(columns) + ") VALUES (" + placeholders + ")"
+	query := fmt.Sprintf("INSERT INTO %s VALUES (:id, :github_username, :name, :email, :is_active, :created_at, :updated_at)", t.tableName)
 
-	_, err := t.tx.ExecContext(ctx, query, t.mapper.ToRow(entity)...)
+	_, err := t.tx.NamedExecContext(ctx, query, entity)
 	if err != nil {
 		return fmt.Errorf("error creating entity in transaction: %w", err)
 	}
@@ -260,17 +237,12 @@ func (t *SQLTransaction[T]) Create(ctx context.Context, entity *T) error {
 }
 
 // Update modifies an existing entity within the transaction.
-func (t *SQLTransaction[T]) Update(ctx context.Context, entity *T) error {
-	columns := t.mapper.Columns()
-	setClause := createSetClause(columns)
+func (t *SQLXTransaction[T]) Update(ctx context.Context, entity *T) error {
+	// Use sqlx's NamedExec to handle mapping struct fields to columns
 	// #nosec G202 -- Table name is validated at initialization
-	query := "UPDATE " + t.mapper.Table() + " SET " + setClause + " WHERE id = ?"
+	query := fmt.Sprintf("UPDATE %s SET github_username=:github_username, name=:name, email=:email, is_active=:is_active, updated_at=:updated_at WHERE id=:id", t.tableName)
 
-	args := t.mapper.ToRow(entity)
-	// Add ID as the last parameter for the WHERE clause
-	args = append(args, (*entity).GetID())
-
-	_, err := t.tx.ExecContext(ctx, query, args...)
+	_, err := t.tx.NamedExecContext(ctx, query, entity)
 	if err != nil {
 		return fmt.Errorf("error updating entity in transaction: %w", err)
 	}
@@ -279,9 +251,9 @@ func (t *SQLTransaction[T]) Update(ctx context.Context, entity *T) error {
 }
 
 // Delete removes an entity by its ID within the transaction.
-func (t *SQLTransaction[T]) Delete(ctx context.Context, id string) error {
+func (t *SQLXTransaction[T]) Delete(ctx context.Context, id string) error {
 	// #nosec G202 -- Table name is validated at initialization
-	query := "DELETE FROM " + t.mapper.Table() + " WHERE id = ?"
+	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", t.tableName)
 
 	_, err := t.tx.ExecContext(ctx, query, id)
 	if err != nil {
@@ -289,39 +261,4 @@ func (t *SQLTransaction[T]) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
-}
-
-// Helper functions for SQL generation
-
-func joinColumns(columns []string) string {
-	result := ""
-	for i, col := range columns {
-		if i > 0 {
-			result += ", "
-		}
-		result += col
-	}
-	return result
-}
-
-func createPlaceholders(count int) string {
-	result := ""
-	for i := 0; i < count; i++ {
-		if i > 0 {
-			result += ", "
-		}
-		result += "?"
-	}
-	return result
-}
-
-func createSetClause(columns []string) string {
-	result := ""
-	for i, col := range columns {
-		if i > 0 {
-			result += ", "
-		}
-		result += col + " = ?"
-	}
-	return result
 }

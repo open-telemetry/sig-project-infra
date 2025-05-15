@@ -216,7 +216,7 @@ func TestMockRepository(t *testing.T) {
 			AssignmentID:   assignment.ID,
 			IssueNumber:    123,
 			Repository:     "org/repo",
-			Status:         string(oncall.StatusPending),
+			Status:         oncall.StatusPending,
 			EscalationTime: time.Now(),
 		}
 		err = repo.CreateEscalation(ctx, escalation)
@@ -244,13 +244,13 @@ func TestMockRepository(t *testing.T) {
 		assert.Equal(t, escalation.ID, issueEscalation.ID)
 
 		// Update
-		escalation.Status = string(oncall.StatusAcknowledged)
+		escalation.Status = oncall.StatusAcknowledged
 		err = repo.UpdateEscalation(ctx, escalation)
 		require.NoError(t, err)
 
 		found, err = repo.FindEscalationByID(ctx, escalation.ID)
 		require.NoError(t, err)
-		assert.Equal(t, string(oncall.StatusAcknowledged), found.Status)
+		assert.Equal(t, oncall.StatusAcknowledged, found.Status)
 
 		// Delete
 		err = repo.DeleteEscalation(ctx, escalation.ID)

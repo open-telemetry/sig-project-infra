@@ -375,7 +375,7 @@ func (o *Module) handleAckCommand(repo string, issueNumber int, commenter string
 			AssignmentID: assignment.ID,
 			IssueNumber:  issueNumber,
 			Repository:   repo,
-			Status:       string(StatusAcknowledged),
+			Status:       StatusAcknowledged,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
 		}
@@ -393,8 +393,8 @@ func (o *Module) handleAckCommand(repo string, issueNumber int, commenter string
 	}
 
 	// Escalation exists - update it
-	if escalation.Status == string(StatusPending) || escalation.Status == string(StatusEscalated) {
-		escalation.Status = string(StatusAcknowledged)
+	if escalation.Status == StatusPending || escalation.Status == StatusEscalated {
+		escalation.Status = StatusAcknowledged
 		escalation.UpdatedAt = time.Now()
 		if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
 			return fmt.Errorf("error updating escalation: %w", err)
@@ -427,7 +427,7 @@ func (o *Module) handleEscalateCommand(repo string, issueNumber int, _ string) e
 			ID:             uuid.New().String(),
 			IssueNumber:    issueNumber,
 			Repository:     repo,
-			Status:         string(StatusEscalated),
+			Status:         StatusEscalated,
 			EscalationTime: time.Now(),
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
@@ -483,7 +483,7 @@ func (o *Module) handleEscalateCommand(repo string, issueNumber int, _ string) e
 	}
 
 	// Escalation exists - update it
-	escalation.Status = string(StatusEscalated)
+	escalation.Status = StatusEscalated
 	escalation.EscalationTime = time.Now()
 	escalation.UpdatedAt = time.Now()
 	if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
@@ -515,7 +515,7 @@ func (o *Module) handleResolveCommand(repo string, issueNumber int, commenter st
 	}
 
 	// Update the escalation
-	escalation.Status = string(StatusResolved)
+	escalation.Status = StatusResolved
 	escalation.ResolutionTime = time.Now()
 	escalation.UpdatedAt = time.Now()
 	if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
@@ -745,7 +745,7 @@ func (o *Module) handleAckPRCommand(repo string, prNumber int, commenter string)
 			AssignmentID: assignment.ID,
 			PRNumber:     prNumber,
 			Repository:   repo,
-			Status:       string(StatusAcknowledged),
+			Status:       StatusAcknowledged,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
 		}
@@ -763,8 +763,8 @@ func (o *Module) handleAckPRCommand(repo string, prNumber int, commenter string)
 	}
 
 	// Escalation exists - update it
-	if escalation.Status == string(StatusPending) || escalation.Status == string(StatusEscalated) {
-		escalation.Status = string(StatusAcknowledged)
+	if escalation.Status == StatusPending || escalation.Status == StatusEscalated {
+		escalation.Status = StatusAcknowledged
 		escalation.UpdatedAt = time.Now()
 		if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
 			return fmt.Errorf("error updating escalation: %w", err)
@@ -798,7 +798,7 @@ func (o *Module) handleEscalatePRCommand(repo string, prNumber int, _ string) er
 			ID:             uuid.New().String(),
 			PRNumber:       prNumber,
 			Repository:     repo,
-			Status:         string(StatusEscalated),
+			Status:         StatusEscalated,
 			EscalationTime: time.Now(),
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
@@ -819,7 +819,7 @@ func (o *Module) handleEscalatePRCommand(repo string, prNumber int, _ string) er
 	}
 
 	// Escalation exists - update it
-	escalation.Status = string(StatusEscalated)
+	escalation.Status = StatusEscalated
 	escalation.EscalationTime = time.Now()
 	escalation.UpdatedAt = time.Now()
 	if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
@@ -852,7 +852,7 @@ func (o *Module) handleResolvePRCommand(repo string, prNumber int, commenter str
 	}
 
 	// Update the escalation
-	escalation.Status = string(StatusResolved)
+	escalation.Status = StatusResolved
 	escalation.ResolutionTime = time.Now()
 	escalation.UpdatedAt = time.Now()
 	if err := o.Repo.UpdateEscalation(ctx, escalation); err != nil {
@@ -935,7 +935,7 @@ func (o *Module) checkPendingEscalations(ctx context.Context) {
 		}
 
 		// Escalate this issue/PR
-		escalation.Status = string(StatusEscalated)
+		escalation.Status = StatusEscalated
 		escalation.EscalationTime = now
 		escalation.UpdatedAt = now
 		if err := o.Repo.UpdateEscalation(ctx, &escalation); err != nil {

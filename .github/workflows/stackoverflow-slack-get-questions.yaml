@@ -1,0 +1,50 @@
+name: "StackOverflow: Fetch and Post StackOverflow Questions"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+
+jobs:
+  fetch_and_post_questions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Restore statefile cache
+        uses: actions/cache/restore@v3
+        id: restore_cache
+        with:
+          path: state.txt
+          key: stackoverflow-state-
+          restore-keys: stackoverflow-state-
+
+      - name: Fetch and post questions
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL}" ]; then
+            echo "SLACK_WEBHOOK_URL secret is not set. Skipping the action."
+          else
+            python stackoverflow/action.py
+          fi
+
+      - name: Save statefile cache
+        uses: actions/cache/save@v3
+        if: always()
+        id: save_cache
+        with:
+          path: state.txt
+          key: stackoverflow-state-${{ github.run_id }}

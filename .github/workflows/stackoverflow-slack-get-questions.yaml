@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
         with:
           python-version: '3.8'
 
@@ -24,7 +24,7 @@ jobs:
           pip install requests
 
       - name: Restore statefile cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3
         id: restore_cache
         with:
           path: state.txt
@@ -42,7 +42,7 @@ jobs:
           fi
 
       - name: Save statefile cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3
         if: always()
         id: save_cache
         with:

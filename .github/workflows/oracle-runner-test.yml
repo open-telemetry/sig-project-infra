@@ -6,7 +6,15 @@ on:
 jobs:
   test:
     runs-on: oracle-bare-metal-64cpu-512gb-x86-64
+    container:
+      image: python:3.11-slim  # Use any Docker image from Docker Hub or GitHub Container Registry
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - run: echo Hello, World!
+      - name: Run Python script
+        run: |
+          echo "Running inside a container!"
+          python --version
+          echo "print('Hello from inside the container!')" > script.py
+          python script.py

@@ -1,0 +1,12 @@
+name: PR Test
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: oracle-bare-metal-64cpu-512gb-x86-64
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: echo Hello, World!

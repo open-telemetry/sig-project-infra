@@ -13,7 +13,7 @@ For more information about the maintainer role, see the [community repository](h
 
 ## Approvers
 
-* [Adriel Perkins](https://github.com/austinlparker), Liatrio
+* [Adriel Perkins](https://github.com/adrielp), Liatrio
 * [Jacob Aronoff](https://github.com/jaronoff97), Omlet
 
 For more information about the approver role, see the [community repository](https://github.com/open-telemetry/community/blob/main/community-membership.md#approver).

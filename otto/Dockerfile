@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.17@sha256:38387523653efa0039f8e1c89bb74a30504e76ee9f565e25c9a09841f9427b05
-FROM golang:1.24.4-bullseye@sha256:dfd72198d14bc22f270c9e000c304a2ffd19f5a5f693fad82643311afdc6b568 as builder
+FROM golang:1.24.4-bullseye@sha256:0dcdc5b3a99a9d999d52061c8a0b4eafbb3c7bc81a81b1789d81a2eca9a2c7ab as builder
 
 WORKDIR /src
 COPY . .

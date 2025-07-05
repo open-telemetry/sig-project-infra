@@ -5,9 +5,14 @@ on:
   schedule:
     - cron: "30 0 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Cleanup
         env:

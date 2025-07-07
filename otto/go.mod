@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/1password/onepassword-sdk-go v0.3.1
 	github.com/google/go-github/v71 v71.0.0
-	github.com/google/go-github/v72 v72.0.0
+	github.com/google/go-github/v73 v73.0.0
 	github.com/jferrl/go-githubauth v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	go.opentelemetry.io/contrib/bridges/otelslog v0.11.0

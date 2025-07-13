@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: "0 * * * *"
 
+permissions:
+  contents: read
+
 jobs:
   fetch_and_post_questions:
     runs-on: ubuntu-latest

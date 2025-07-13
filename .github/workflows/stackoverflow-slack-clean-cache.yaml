@@ -5,8 +5,13 @@ on:
   schedule:
     - cron: "30 0 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   cleanup:
+    permissions:
+      actions: write # required for deleting cache entries
     runs-on: ubuntu-latest
     steps:
       - name: Cleanup

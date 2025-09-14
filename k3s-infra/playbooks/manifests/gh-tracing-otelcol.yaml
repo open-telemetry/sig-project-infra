@@ -55,10 +55,6 @@ spec:
         limit_percentage: 75
         spike_limit_percentage: 15
 
-      batch:
-        send_batch_size: 100
-        timeout: 10s
-
     exporters:
       debug:
         verbosity: basic
@@ -95,7 +91,6 @@ spec:
             - github
           processors:
             - memory_limiter
-            - batch
           exporters:
             - debug
             # - otlp
@@ -107,7 +102,6 @@ spec:
             - otlp
           processors:
             - memory_limiter
-            - batch
           exporters:
             - debug
             - otlp/signoz

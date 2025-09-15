@@ -71,12 +71,16 @@ spec:
         endpoint: signoz-otel-collector.signoz:4317
         tls:
           insecure: true
+        sending_queue:
+          batch:
 
       otlp/honeycomb:
         endpoint: api.honeycomb.io:443
         headers:
           x-honeycomb-team: ${env:HONEYCOMB_INGEST_KEY}
           x-honeycomb-dataset: vcs-metrics
+        sending_queue:
+          batch:
 
     service:
       extensions:

@@ -8,7 +8,7 @@ require (
 	github.com/google/go-github/v72 v72.0.0
 	github.com/jferrl/go-githubauth v1.2.1
 	github.com/mattn/go-sqlite3 v1.14.32
-	go.opentelemetry.io/contrib/bridges/otelslog v0.11.0
+	go.opentelemetry.io/contrib/bridges/otelslog v0.13.0
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.38.0

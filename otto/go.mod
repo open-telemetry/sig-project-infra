@@ -1,11 +1,10 @@
 module github.com/open-telemetry/sig-project-infra/otto
 
-go 1.24.1
+go 1.25
 
 require (
 	github.com/1password/onepassword-sdk-go v0.3.1
 	github.com/google/go-github/v71 v71.0.0
-	github.com/google/go-github/v72 v72.0.0
 	github.com/jferrl/go-githubauth v1.2.1
 	github.com/mattn/go-sqlite3 v1.14.32
 	go.opentelemetry.io/contrib/bridges/otelslog v0.13.0
@@ -24,7 +23,6 @@ require (
 )
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/dylibso/observe-sdk/go v0.0.0-20240828172851-9145d8ad07e1 // indirect
 	github.com/extism/go-sdk v1.7.1 // indirect

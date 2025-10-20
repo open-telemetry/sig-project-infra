@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	// Import sqlite driver for database/sql.
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // TestApp creates a test application with mock dependencies.
@@ -73,7 +73,7 @@ github_private_key_path: ""
 
 // TestDB creates an in-memory SQLite database for testing.
 func TestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}

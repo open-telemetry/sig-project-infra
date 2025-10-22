@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     cd ./otto && go build -o /out/otto ./cmd/otto
 
-FROM debian:bullseye-slim@sha256:f807f4b16002c623115b0247dca6a55711c6b1ae821dc64fb8a2339e4ce2115d
+FROM debian:bullseye-slim@sha256:52927eff8153b563244f98cdc802ba97918afcdf67f9e4867cbf1f7afb3d147b
 RUN useradd -m otto
 COPY --from=builder /out/otto /usr/local/bin/otto
 USER otto

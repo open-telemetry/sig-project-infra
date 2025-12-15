@@ -9,7 +9,7 @@ require (
 	github.com/google/go-github/v80 v80.0.0
 	github.com/jferrl/go-githubauth v1.5.0
 	github.com/jferrl/go-githubauth/v2 v2.0.0
-	go.opentelemetry.io/contrib/bridges/otelslog v0.13.0
+	go.opentelemetry.io/contrib/bridges/otelslog v0.14.0
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.15.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.39.0

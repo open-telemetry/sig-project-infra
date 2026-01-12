@@ -7,7 +7,7 @@ require (
 	github.com/google/go-github/v71 v71.0.0
 	github.com/google/go-github/v80 v80.0.0
 	github.com/google/go-github/v81 v81.0.0
-	github.com/jferrl/go-githubauth v1.5.0
+	github.com/jferrl/go-githubauth/v2 v2.0.0
 	github.com/jferrl/go-githubauth/v2 v2.0.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.14.0
 	go.opentelemetry.io/otel v1.39.0

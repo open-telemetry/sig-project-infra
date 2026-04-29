@@ -1,14 +1,13 @@
 module github.com/open-telemetry/sig-project-infra/otto
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/1password/onepassword-sdk-go v0.3.1
 	github.com/google/go-github/v71 v71.0.0
 	github.com/google/go-github/v81 v81.0.0
-	github.com/google/go-github/v81 v81.0.0
-	github.com/jferrl/go-githubauth v1.5.0
-	github.com/jferrl/go-githubauth/v2 v2.0.0
+	github.com/jferrl/go-githubauth v1.6.0
+	github.com/jferrl/go-githubauth/v2 v2.0.1
 	go.opentelemetry.io/contrib/bridges/otelslog v0.14.0
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.15.0
@@ -20,7 +19,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.15.0
 	go.opentelemetry.io/otel/sdk/metric v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.43.0
 )
@@ -34,7 +33,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-github/v74 v74.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
